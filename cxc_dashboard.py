@@ -339,28 +339,29 @@ def build_exec_kpis(summary, rows, name, fantasy_lookup=None):
     d61_90 = sum(r["d61_90"] for r in rows)
     d90plus = sum(r["d90plus"] for r in rows)
 
-    # Días de calle: promedio ponderado por monto
-    # Si dias_mora está disponible lo usamos; si no, usamos punto medio del tramo
+    # Días de calle: tramo más alto con saldo (sin ponderar por monto)
+    # Criterio: se usa el punto medio del tramo de mayor antigüedad que tenga saldo
+    # >90d→120, 61-90d→75, 31-60d→45, 1-30d→15
     def _dias_calle_from_row(r):
         if r["dias_mora"] > 0:
-            return r["dias_mora"], r["total"]
-        # Calcular desde tramos con punto medio: 1-30→15, 31-60→45, 61-90→75, >90→120
-        weighted = r["d1_30"]*15 + r["d31_60"]*45 + r["d61_90"]*75 + r["d90plus"]*120
-        denom = r["d1_30"] + r["d31_60"] + r["d61_90"] + r["d90plus"]
-        if denom > 0:
-            return weighted / denom, denom
-        return 0.0, 0.0
+            return r["dias_mora"]
+        if r["d90plus"] > 0:  return 120.0
+        if r["d61_90"]  > 0:  return 75.0
+        if r["d31_60"]  > 0:  return 45.0
+        if r["d1_30"]   > 0:  return 15.0
+        return 0.0
 
-    total_dias_peso = sum(_dias_calle_from_row(r)[0] * _dias_calle_from_row(r)[1] for r in rows)
-    total_peso      = sum(_dias_calle_from_row(r)[1] for r in rows)
-    dias_calle = total_dias_peso / total_peso if total_peso > 0 else 0.0
+    # Promedio simple entre todas las facturas vencidas (sin ponderar por monto)
+    rows_vencidos = [r for r in rows if r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
+    dias_calle = (sum(_dias_calle_from_row(r) for r in rows_vencidos) / len(rows_vencidos)
+                  if rows_vencidos else 0.0)
 
-    # Días de calle por cliente
+    # Días de calle por cliente: promedio simple de sus facturas vencidas
     for c in clients:
-        c_rows = [r for r in rows if r["rut"] == c["rut"]]
-        c_peso = sum(_dias_calle_from_row(r)[1] for r in c_rows)
-        c_dias = sum(_dias_calle_from_row(r)[0] * _dias_calle_from_row(r)[1] for r in c_rows)
-        c["dias_calle"] = c_dias / c_peso if c_peso > 0 else 0.0
+        c_rows = [r for r in rows if r["rut"] == c["rut"]
+                  and r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
+        c["dias_calle"] = (sum(_dias_calle_from_row(r) for r in c_rows) / len(c_rows)
+                           if c_rows else 0.0)
 
     return {
         "nombre": name,
@@ -531,10 +532,17 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
     sin_exec_html = ""
     if sin_exec_rows:
         sin_clients = aggregate_by_client(sin_exec_rows)
+        def _dc_row(r):
+            if r.get("dias_mora",0) > 0: return r["dias_mora"]
+            if r["d90plus"] > 0: return 120.0
+            if r["d61_90"]  > 0: return 75.0
+            if r["d31_60"]  > 0: return 45.0
+            if r["d1_30"]   > 0: return 15.0
+            return 0.0
         for c in sin_clients:
-            dc_peso = sum((r["d1_30"]*15+r["d31_60"]*45+r["d61_90"]*75+r["d90plus"]*120) for r in sin_exec_rows if r["rut"]==c["rut"])
-            dc_denom = sum(r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] for r in sin_exec_rows if r["rut"]==c["rut"])
-            c["dias_calle"] = dc_peso/dc_denom if dc_denom else 0
+            c_rows = [r for r in sin_exec_rows if r["rut"]==c["rut"]
+                      and r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
+            c["dias_calle"] = (sum(_dc_row(r) for r in c_rows)/len(c_rows) if c_rows else 0)
         sin_client_rows = ""
         for c in sin_clients:
             rb = risk_badge(c["pct_vencido"])
@@ -891,7 +899,7 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
   </div>
   <div class="gkpi warning">
     <div class="label">Días de Calle Promedio</div>
-    <div class="value">{(sum(e['dias_calle']*e['vencido'] for e in exec_data)/vencido_global if vencido_global else 0):.0f} días</div>
+    <div class="value">{(sum(e['dias_calle'] for e in exec_data)/len(exec_data) if exec_data else 0):.0f} días</div>
   </div>
 </div>
 
