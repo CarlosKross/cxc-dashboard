@@ -1,0 +1,29 @@
+# Credenciales y configuración sensible
+email_config.json
+
+# Archivos temporales Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Entornos virtuales
+venv/
+env/
+.env
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Archivos Excel subidos (datos privados)
+*.xlsx
+*.xls
+
+# Streamlit cache
+.streamlit/
+
+# Claude
+.claude/

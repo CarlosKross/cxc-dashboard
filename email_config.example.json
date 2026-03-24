@@ -1,0 +1,12 @@
+{
+  "smtp": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "user": "tu_correo@kross.cl",
+    "password": "tu_contrasena_de_aplicacion"
+  },
+  "ejecutivos": {
+    "Nombre Ejecutivo": "correo@kross.cl"
+  },
+  "jefaturas": ["jefatura@kross.cl"]
+}
