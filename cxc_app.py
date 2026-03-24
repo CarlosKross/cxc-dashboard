@@ -24,6 +24,24 @@ from cxc_dashboard import (
 EMAIL_CONFIG_PATH = Path(__file__).parent / "email_config.json"
 
 def load_email_config():
+    # Primero intentar desde Streamlit Secrets (entorno cloud)
+    try:
+        s = st.secrets
+        if "smtp" in s:
+            cfg = {
+                "smtp": {
+                    "host":     s["smtp"].get("host", "smtp.gmail.com"),
+                    "port":     int(s["smtp"].get("port", 587)),
+                    "user":     s["smtp"]["user"],
+                    "password": s["smtp"]["password"],
+                },
+                "ejecutivos": dict(s.get("ejecutivos", {})),
+                "jefaturas":  list(s.get("jefaturas", {}).get("lista", [])),
+            }
+            return cfg
+    except Exception:
+        pass
+    # Fallback: archivo local email_config.json
     if EMAIL_CONFIG_PATH.exists():
         return json.loads(EMAIL_CONFIG_PATH.read_text(encoding="utf-8"))
     return {}
