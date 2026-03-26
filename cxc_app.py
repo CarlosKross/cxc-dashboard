@@ -160,18 +160,18 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* ── Kross Brand Colors ───────────────────────────────── */
+    /* ── Kross Brand Colors ── fondo claro, acento amarillo ── */
     :root {
         --kross-yellow: #F5C200;
         --kross-dark:   #111111;
-        --kross-gray:   #1e1e1e;
+        --kross-bg:     #F7F5EF;
     }
 
-    /* Fondo general */
-    .stApp { background-color: #111111; }
+    /* Fondo general beige/blanco */
+    .stApp { background-color: #F7F5EF; }
     .block-container { max-width: 780px; padding-top: 0 !important; }
 
-    /* Header de marca */
+    /* Header de marca: amarillo con texto negro bold */
     .kross-header {
         background: #F5C200;
         padding: 18px 32px 14px;
@@ -179,6 +179,7 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 16px;
+        border-bottom: 3px solid #d4a800;
     }
     .kross-header h1 {
         color: #111111 !important;
@@ -189,14 +190,16 @@ st.markdown("""
         text-transform: uppercase;
     }
     .kross-header .sub {
-        color: #333;
+        color: #444;
         font-size: 12px;
         margin-top: 2px;
+        font-weight: 600;
     }
 
-    /* Títulos y texto general */
-    h1, h2, h3 { color: #F5C200 !important; }
-    p, label, .stMarkdown { color: #e0e0e0 !important; }
+    /* Títulos y texto */
+    h1, h2, h3 { color: #111111 !important; }
+    h2, h3 { border-left: 4px solid #F5C200; padding-left: 10px; }
+    p, label, .stMarkdown { color: #333333 !important; }
 
     /* Botón primario → amarillo Kross */
     .stButton > button[kind="primary"] {
@@ -214,9 +217,9 @@ st.markdown("""
 
     /* Botón secundario */
     .stButton > button {
-        background: #222 !important;
-        color: #F5C200 !important;
-        border: 1px solid #F5C200 !important;
+        background: #fff !important;
+        color: #111 !important;
+        border: 1px solid #ccc !important;
         border-radius: 6px !important;
     }
 
@@ -224,53 +227,55 @@ st.markdown("""
     [data-testid="stFileUploader"] {
         border: 2px dashed #F5C200 !important;
         border-radius: 8px !important;
-        background: #1a1a1a !important;
+        background: #fff !important;
     }
 
     /* Inputs */
     .stTextInput input, .stTextArea textarea {
-        background: #1e1e1e !important;
-        color: #fff !important;
-        border: 1px solid #444 !important;
+        background: #fff !important;
+        color: #111 !important;
+        border: 1px solid #ddd !important;
         border-radius: 6px !important;
     }
     .stTextInput input:focus, .stTextArea textarea:focus {
         border-color: #F5C200 !important;
+        box-shadow: 0 0 0 2px rgba(245,194,0,.2) !important;
     }
 
     /* Métricas */
     [data-testid="stMetric"] {
-        background: #1e1e1e;
+        background: #fff;
         border-radius: 8px;
         padding: 12px 16px;
         border-left: 4px solid #F5C200;
+        box-shadow: 0 1px 4px rgba(0,0,0,.08);
     }
-    [data-testid="stMetricLabel"] { color: #aaa !important; }
-    [data-testid="stMetricValue"] { color: #F5C200 !important; }
+    [data-testid="stMetricLabel"] { color: #777 !important; }
+    [data-testid="stMetricValue"] { color: #111 !important; font-weight: 800 !important; }
 
     /* Alertas */
-    .stSuccess { background: #1a2e1a !important; border-color: #2ecc71 !important; }
-    .stWarning { background: #2e2a1a !important; border-color: #F5C200 !important; }
-    .stError   { background: #2e1a1a !important; border-color: #e74c3c !important; }
+    .stSuccess { background: #f0faf4 !important; border-color: #2ecc71 !important; color: #1a6b3a !important; }
+    .stWarning { background: #fffbea !important; border-color: #F5C200 !important; color: #7a5f00 !important; }
+    .stError   { background: #fff0f0 !important; border-color: #e74c3c !important; color: #8b1a1a !important; }
 
     /* Expander */
     [data-testid="stExpander"] {
-        background: #1e1e1e !important;
-        border: 1px solid #333 !important;
+        background: #fff !important;
+        border: 1px solid #e8e4d8 !important;
         border-radius: 8px !important;
     }
 
     /* Divider */
-    hr { border-color: #333 !important; }
+    hr { border-color: #e8e4d8 !important; }
 
     /* Caption */
-    .stCaption { color: #666 !important; }
+    .stCaption { color: #999 !important; }
 
     /* Checkbox */
-    .stCheckbox label { color: #e0e0e0 !important; }
+    .stCheckbox label { color: #333 !important; }
 
     /* Subheader */
-    .stSubheader { color: #F5C200 !important; }
+    .stSubheader { color: #111 !important; }
 
     /* Download button */
     [data-testid="stDownloadButton"] > button {

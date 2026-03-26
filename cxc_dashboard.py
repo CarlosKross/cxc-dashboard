@@ -640,7 +640,7 @@ def generate_individual_html(e, report_date=""):
 <title>Informe CxC — {e['nombre']}</title>
 <style>
   *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-  body{{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#222;font-size:13px}}
+  body{{font-family:'Segoe UI',Arial,sans-serif;background:#F7F5EF;color:#222;font-size:13px}}
   .header{{background:linear-gradient(135deg,#111111,#222222);color:#F5C200;padding:24px 32px}}
   .header h1{{font-size:20px;font-weight:700}}
   .header .sub{{font-size:12px;color:#999999;margin-top:4px}}
@@ -832,7 +832,7 @@ def generate_email_body(e, report_date=""):
 <html lang="es">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Informe CxC — {e['nombre']}</title></head>
-<body style="margin:0;padding:0;background:#f0f2f5;font-family:'Segoe UI',Arial,sans-serif">
+<body style="margin:0;padding:0;background:#F7F5EF;font-family:'Segoe UI',Arial,sans-serif">
 <div style="max-width:900px;margin:0 auto;padding:20px">
 
   <!-- Header -->
@@ -842,7 +842,7 @@ def generate_email_body(e, report_date=""):
   </div>
 
   <!-- KPIs -->
-  <div style="background:#f0f2f5;padding:16px 0">
+  <div style="background:#F7F5EF;padding:16px 0">
     <table style="border-collapse:separate;border-spacing:10px;width:100%"><tr>{kpis_row}</tr></table>
     <table style="border-collapse:separate;border-spacing:10px;width:100%"><tr>{tramos_row}</tr></table>
   </div>
@@ -1162,7 +1162,7 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; font-size: 13px; }}
+  body {{ font-family: 'Segoe UI', Arial, sans-serif; background: #F7F5EF; color: #222; font-size: 13px; }}
 
   /* HEADER */
   .header {{ background: linear-gradient(135deg, #111111 0%, #222222 100%); color: #F5C200; padding: 24px 32px; }}
