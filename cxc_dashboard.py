@@ -534,28 +534,59 @@ def risk_badge(pct):
 
 
 def generate_individual_html(e, report_date=""):
-    """Genera un informe HTML para un solo ejecutivo."""
+    """Genera un informe HTML individual para un ejecutivo con detalle de facturas expandible."""
     pct   = e["pct_vencido"]
     color = COLORS.get(e["nombre"], "#4F8EF7")
-    sc    = semaforo_class(pct)
 
+    # Construir filas de clientes + facturas expandibles
     client_rows = ""
-    for c in e["clientes"]:
+    for i, c in enumerate(e["clientes"]):
         if c["vencido"] <= 0:
             continue
-        rb = risk_badge(c["pct_vencido"])
+        uid  = f"c{i}"
+        rb   = risk_badge(c["pct_vencido"])
+        ninv = len(c.get("invoices", []))
+        arrow = f'<span id="arr_{uid}" style="margin-right:6px;cursor:pointer;font-size:11px">▶</span>' if ninv else ""
+
         client_rows += f"""
-        <tr>
-          <td>{c['rut']}</td>
+        <tr class="client-row" onclick="toggleInv('{uid}')" style="cursor:{'pointer' if ninv else 'default'}">
+          <td>{arrow}<span style="font-size:10px;color:#888">{c['rut']}</span></td>
           <td class="client-name">{c['cliente']}</td>
-          <td class="num">{fmt_clp(c['d1_30'])}</td>
-          <td class="num">{fmt_clp(c['d31_60'])}</td>
-          <td class="num">{fmt_clp(c['d61_90'])}</td>
-          <td class="num">{fmt_clp(c['d90plus'])}</td>
-          <td class="num bold">{fmt_clp(c['vencido'])}</td>
+          <td class="num" style="color:#888">{fmt_clp(c['no_vencido'])}</td>
+          <td class="num bold">{fmt_clp(c['total'])}</td>
+          <td class="num" style="color:#f39c12">{fmt_clp(c['d1_30'])}</td>
+          <td class="num" style="color:#e67e22">{fmt_clp(c['d31_60'])}</td>
+          <td class="num" style="color:#c0392b">{fmt_clp(c['d61_90'])}</td>
+          <td class="num" style="color:#7b241c">{fmt_clp(c['d90plus'])}</td>
+          <td class="num bold" style="color:#1a2e4a">{fmt_clp(c['vencido'])}</td>
           <td class="num">{c['dias_calle']:.0f} d.</td>
           <td>{rb}</td>
+          <td class="num" style="color:#888;font-size:11px">{ninv if ninv else '—'}</td>
         </tr>"""
+
+        # Filas de facturas
+        if ninv:
+            inv_rows = ""
+            for inv in c["invoices"]:
+                tramo = ""
+                if inv["d90plus"] > 0:   tramo = f'<span style="color:#7b241c;font-weight:700">&gt;90 d.</span>'
+                elif inv["d61_90"] > 0:  tramo = f'<span style="color:#c0392b">61–90 d.</span>'
+                elif inv["d31_60"] > 0:  tramo = f'<span style="color:#e67e22">31–60 d.</span>'
+                elif inv["d1_30"] > 0:   tramo = f'<span style="color:#f39c12">1–30 d.</span>'
+                monto_v = inv["d1_30"] + inv["d31_60"] + inv["d61_90"] + inv["d90plus"]
+                inv_rows += f"""<tr class="inv-row">
+                  <td colspan="2" style="padding-left:32px;color:#555;font-size:11px">
+                    📄 Factura {inv['factura'] or '—'}</td>
+                  <td class="num" style="font-size:11px;color:#888">{inv['emision'] or '—'}</td>
+                  <td class="num" style="font-size:11px;color:#888">{inv['vencimiento'] or '—'}</td>
+                  <td colspan="4" style="text-align:center">{tramo}</td>
+                  <td class="num bold" style="font-size:11px">{fmt_clp(monto_v)}</td>
+                  <td colspan="3"></td>
+                </tr>"""
+            client_rows += f'<tr id="inv_{uid}" style="display:none"><td colspan="12" style="padding:0"><table style="width:100%;border-radius:0;box-shadow:none;background:#fafbfd">{inv_rows}</table></td></tr>'
+
+    if not client_rows:
+        client_rows = '<tr><td colspan="12" style="text-align:center;padding:20px;color:#888">Sin clientes con deuda vencida</td></tr>'
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -570,25 +601,25 @@ def generate_individual_html(e, report_date=""):
   .header h1{{font-size:20px;font-weight:700}}
   .header .sub{{font-size:12px;color:#b0c4de;margin-top:4px}}
   .kpis{{display:flex;gap:14px;padding:20px 32px;flex-wrap:wrap}}
-  .kpi{{background:#fff;border-radius:10px;padding:16px 20px;flex:1;min-width:140px;
+  .kpi{{background:#fff;border-radius:10px;padding:16px 20px;flex:1;min-width:130px;
         box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid {color}}}
   .kpi.red{{border-top-color:#e74c3c}}.kpi.yellow{{border-top-color:#f39c12}}.kpi.green{{border-top-color:#27ae60}}
   .kpi .label{{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px}}
-  .kpi .value{{font-size:20px;font-weight:700;margin-top:5px;color:#1a2e4a}}
+  .kpi .value{{font-size:18px;font-weight:700;margin-top:5px;color:#1a2e4a}}
   .kpi.red .value{{color:#e74c3c}}.kpi.yellow .value{{color:#f39c12}}.kpi.green .value{{color:#27ae60}}
   .section{{padding:0 32px 32px}}
   .title{{font-size:13px;font-weight:700;color:#1a2e4a;text-transform:uppercase;
           letter-spacing:.5px;margin-bottom:12px;padding-left:8px;border-left:4px solid {color}}}
-  .progress-wrap{{display:flex;align-items:center;gap:12px;padding:12px 32px}}
+  .progress-wrap{{display:flex;align-items:center;gap:12px;padding:12px 32px 20px}}
   .track{{flex:1;height:10px;background:#e8edf3;border-radius:5px;overflow:hidden}}
   .fill{{height:100%;border-radius:5px;background:{color}}}
-  .plabel{{font-size:12px;color:#555;min-width:100px}}
+  .plabel{{font-size:12px;color:#555;min-width:120px}}
   table{{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;
          overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);font-size:12px}}
   thead tr{{background:#1a2e4a;color:#fff}}
-  th{{padding:9px 11px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px}}
+  th{{padding:9px 11px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}}
   td{{padding:8px 11px;border-bottom:1px solid #f0f2f5;vertical-align:middle}}
-  tbody tr:hover{{background:#f7f9fc}}
+  .client-row:hover{{background:#f0f4fa!important}}
   .client-name{{font-weight:600;color:#1a2e4a}}
   .num{{text-align:right;font-variant-numeric:tabular-nums}}
   .bold{{font-weight:700}}
@@ -596,7 +627,9 @@ def generate_individual_html(e, report_date=""):
   .badge-red{{background:#fde8e8;color:#c0392b}}
   .badge-yellow{{background:#fef3cd;color:#d35400}}
   .badge-green{{background:#e8f8ee;color:#1e8449}}
+  .inv-row td{{background:#fafbfd;font-size:11px}}
   .footer{{text-align:center;padding:20px;color:#aaa;font-size:11px}}
+  .tip{{font-size:11px;color:#888;padding:8px 32px 0;font-style:italic}}
 </style>
 </head>
 <body>
@@ -610,6 +643,7 @@ def generate_individual_html(e, report_date=""):
   <div class="kpi green"><div class="label">No Vencido</div><div class="value">{fmt_clp(e['no_vencido'])}</div></div>
   <div class="kpi {'red' if pct>=30 else 'yellow' if pct>=15 else 'green'}"><div class="label">Vencido</div><div class="value">{fmt_clp(e['vencido'])}</div></div>
   <div class="kpi {'red' if pct>=30 else 'yellow' if pct>=15 else 'green'}"><div class="label">% Vencido</div><div class="value">{pct:.1f}%</div></div>
+  <div class="kpi"><div class="label">Días de Calle</div><div class="value">{e['dias_calle']:.0f} d.</div></div>
   <div class="kpi"><div class="label">Clientes Totales</div><div class="value">{e['n_clientes']}</div></div>
   <div class="kpi"><div class="label">Clientes en Mora</div><div class="value">{e['n_clientes_mora']}</div></div>
 </div>
@@ -628,16 +662,30 @@ def generate_individual_html(e, report_date=""):
 
 <div class="section">
   <div class="title">Clientes con Deuda Vencida</div>
+  <p class="tip">Haz clic en una fila para ver el detalle de facturas ▶</p>
+  <br>
   <table>
     <thead><tr>
-      <th>RUT</th><th>Cliente</th><th>1–30 días</th><th>31–60 días</th>
-      <th>61–90 días</th><th>&gt;90 días</th><th>Total Vencido</th><th>Días Calle</th><th>Riesgo</th>
+      <th>RUT</th><th>Cliente</th><th>No Vencido</th><th>Total Cartera</th>
+      <th>1–30 d.</th><th>31–60 d.</th><th>61–90 d.</th><th>&gt;90 d.</th>
+      <th>Total Vencido</th><th>Días Calle</th><th>Riesgo</th><th>Fact.</th>
     </tr></thead>
-    <tbody>{client_rows if client_rows else '<tr><td colspan="9" style="text-align:center;padding:20px;color:#888">Sin clientes con deuda vencida</td></tr>'}</tbody>
+    <tbody>{client_rows}</tbody>
   </table>
 </div>
 
 <div class="footer">Informe CxC {report_date} · Cervecería Kross · Confidencial</div>
+
+<script>
+function toggleInv(uid) {{
+  var row = document.getElementById('inv_' + uid);
+  var arr = document.getElementById('arr_' + uid);
+  if (!row) return;
+  var hidden = row.style.display === 'none';
+  row.style.display = hidden ? 'table-row' : 'none';
+  if (arr) arr.textContent = hidden ? '▼' : '▶';
+}}
+</script>
 </body></html>"""
 
 
