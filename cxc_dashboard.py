@@ -776,15 +776,16 @@ def generate_client_collection_email(cliente, rut, ejecutivo, facturas, total_ve
 
   <!-- Header Kross -->
   <div style="background:#111111;padding:20px 28px;border-radius:10px 10px 0 0;
-              border-bottom:4px solid #F5C200;display:flex;align-items:center;gap:18px">
-    {logo_html}
+              border-bottom:4px solid #F5C200;display:flex;align-items:center;
+              justify-content:space-between">
     <div>
-      <div style="font-size:22px;font-weight:900;color:#F5C200;text-transform:uppercase;
+      <div style="font-size:24px;font-weight:900;color:#F5C200;text-transform:uppercase;
                   letter-spacing:2px;line-height:1">Cervecería Kross</div>
-      <div style="font-size:11px;color:#aaa;margin-top:5px;font-weight:600;
+      <div style="font-size:11px;color:#aaa;margin-top:6px;font-weight:600;
                   letter-spacing:.5px;text-transform:uppercase">
         Área de Cobranza · {report_date}</div>
     </div>
+    {logo_html}
   </div>
 
   <!-- Cuerpo -->
