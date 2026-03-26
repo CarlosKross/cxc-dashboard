@@ -769,12 +769,32 @@ def generate_client_collection_email(cliente, rut, ejecutivo, facturas, total_ve
 <div style="max-width:640px;margin:0 auto;padding:24px">
 
   <!-- Header Kross -->
-  <div style="background:#F5C200;padding:20px 28px;border-radius:10px 10px 0 0;
-              border-bottom:3px solid #d4a800">
-    <div style="font-size:22px;font-weight:900;color:#111;text-transform:uppercase;
-                letter-spacing:1px">🍺 Cervecería Kross</div>
-    <div style="font-size:12px;color:#444;margin-top:2px;font-weight:600">
-      Área de Cobranza · {report_date}</div>
+  <div style="background:#111111;padding:20px 28px;border-radius:10px 10px 0 0;
+              border-bottom:4px solid #F5C200;display:flex;align-items:center;gap:16px">
+    <!-- Schopero SVG -->
+    <svg width="42" height="42" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
+         style="flex-shrink:0">
+      <!-- Vaso schop -->
+      <rect x="10" y="20" width="32" height="36" rx="3" fill="#F5C200"/>
+      <rect x="10" y="20" width="32" height="10" rx="2" fill="#d4a800"/>
+      <!-- Espuma -->
+      <ellipse cx="15" cy="20" rx="4" ry="5" fill="white"/>
+      <ellipse cx="23" cy="18" rx="5" ry="6" fill="white"/>
+      <ellipse cx="31" cy="20" rx="4" ry="5" fill="white"/>
+      <ellipse cx="38" cy="21" rx="3" ry="4" fill="white"/>
+      <!-- Asa -->
+      <path d="M42 28 Q55 28 55 36 Q55 44 42 44" stroke="#F5C200" stroke-width="4"
+            fill="none" stroke-linecap="round"/>
+      <!-- Brillo -->
+      <rect x="15" y="28" width="4" height="18" rx="2" fill="rgba(255,255,255,0.25)"/>
+    </svg>
+    <div>
+      <div style="font-size:22px;font-weight:900;color:#F5C200;text-transform:uppercase;
+                  letter-spacing:2px;line-height:1">Cervecería Kross</div>
+      <div style="font-size:11px;color:#aaa;margin-top:4px;font-weight:600;
+                  letter-spacing:.5px;text-transform:uppercase">
+        Área de Cobranza · {report_date}</div>
+    </div>
   </div>
 
   <!-- Cuerpo -->
