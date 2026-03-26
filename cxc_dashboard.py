@@ -529,19 +529,18 @@ def build_exec_kpis(summary, rows, name, fantasy_lookup=None):
         if r["d1_30"]   > 0:  return 15.0
         return 0.0
 
-    # Días de calle: promedio simple de días exactos desde vencimiento por factura vencida
-    # Si dias_mora está disponible (calculado desde fecha vencimiento), se usa directamente.
-    # Si no, se estima con el tramo más alto con saldo.
-    rows_vencidos = [r for r in rows if r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
-    dias_calle = (sum(_dias_calle_from_row(r) for r in rows_vencidos) / len(rows_vencidos)
-                  if rows_vencidos else 0.0)
-
-    # Días de calle por cliente: promedio simple de sus facturas vencidas
+    # Días de calle por cliente: factura más antigua (max días post vencimiento)
     for c in clients:
         c_rows = [r for r in rows if r["rut"] == c["rut"]
                   and r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
-        c["dias_calle"] = (sum(_dias_calle_from_row(r) for r in c_rows) / len(c_rows)
-                           if c_rows else 0.0)
+        c["dias_calle"] = max((_dias_calle_from_row(r) for r in c_rows), default=0.0)
+        # Guardar días exactos en cada factura para mostrar en detalle
+        for inv in c.get("invoices", []):
+            inv["dias_atraso"] = _dias_calle_from_row(inv)
+
+    # KPI ejecutivo: factura más antigua de toda su cartera
+    rows_vencidos = [r for r in rows if r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
+    dias_calle = max((_dias_calle_from_row(r) for r in rows_vencidos), default=0.0)
 
     return {
         "nombre": name,
@@ -595,7 +594,7 @@ def generate_individual_html(e, report_date=""):
           <td class="num" style="color:#c0392b">{fmt_clp(c['d61_90'])}</td>
           <td class="num" style="color:#7b241c">{fmt_clp(c['d90plus'])}</td>
           <td class="num bold" style="color:#1a2e4a">{fmt_clp(c['vencido'])}</td>
-          <td class="num">{c['dias_calle']:.0f} d.</td>
+          <td class="num">{c['dias_calle']:.0f} días</td>
           <td>{rb}</td>
           <td class="num" style="color:#888;font-size:11px">{ninv if ninv else '—'}</td>
         </tr>"""
@@ -604,18 +603,27 @@ def generate_individual_html(e, report_date=""):
         if ninv:
             inv_rows = ""
             for inv in c["invoices"]:
-                tramo = ""
-                if inv["d90plus"] > 0:   tramo = f'<span style="color:#7b241c;font-weight:700">&gt;90 d.</span>'
-                elif inv["d61_90"] > 0:  tramo = f'<span style="color:#c0392b">61–90 d.</span>'
-                elif inv["d31_60"] > 0:  tramo = f'<span style="color:#e67e22">31–60 d.</span>'
-                elif inv["d1_30"] > 0:   tramo = f'<span style="color:#f39c12">1–30 d.</span>'
+                tramo_color = ""
+                tramo_label = ""
+                if inv["d90plus"] > 0:
+                    tramo_color = "#7b241c"; tramo_label = "&gt;90 d."
+                elif inv["d61_90"] > 0:
+                    tramo_color = "#c0392b"; tramo_label = "61–90 d."
+                elif inv["d31_60"] > 0:
+                    tramo_color = "#e67e22"; tramo_label = "31–60 d."
+                elif inv["d1_30"] > 0:
+                    tramo_color = "#f39c12"; tramo_label = "1–30 d."
+                dias_atraso = int(inv.get("dias_atraso", 0))
+                dias_cell = (f'<strong style="color:{tramo_color}">{dias_atraso} días</strong> '
+                             f'<span style="color:{tramo_color};font-size:10px">({tramo_label})</span>'
+                             if dias_atraso > 0 and tramo_color else "")
                 monto_v = inv["d1_30"] + inv["d31_60"] + inv["d61_90"] + inv["d90plus"]
                 inv_rows += f"""<tr class="inv-row">
                   <td colspan="2" style="padding-left:32px;color:#555;font-size:11px">
                     📄 Factura {inv['factura'] or '—'}</td>
                   <td class="num" style="font-size:11px;color:#888">{inv['emision'] or '—'}</td>
                   <td class="num" style="font-size:11px;color:#888">{inv['vencimiento'] or '—'}</td>
-                  <td colspan="4" style="text-align:center">{tramo}</td>
+                  <td colspan="4" style="text-align:center">{dias_cell}</td>
                   <td class="num bold" style="font-size:11px">{fmt_clp(monto_v)}</td>
                   <td colspan="3"></td>
                 </tr>"""
@@ -788,7 +796,7 @@ def generate_email_body(e, report_date=""):
             f'<td style="{td_r};color:#c0392b">{fmt_clp(c["d61_90"])}</td>'
             f'<td style="{td_r};color:#7b241c">{fmt_clp(c["d90plus"])}</td>'
             f'<td style="{td_r};font-weight:700">{fmt_clp(c["vencido"])}</td>'
-            f'<td style="{td_r}">{c["dias_calle"]:.0f} d.</td>'
+            f'<td style="{td_r}">{c["dias_calle"]:.0f} días</td>'
             f'<td style="{td};text-align:center"><span style="background:{rb_bg};color:{rb_color};'
             f'padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">{rb_txt}</span></td>'
             f'</tr>'
@@ -801,13 +809,17 @@ def generate_email_body(e, report_date=""):
             elif inv["d61_90"] > 0:   tramo_c, tramo_t = "#c0392b", "61–90 d."
             elif inv["d31_60"] > 0:   tramo_c, tramo_t = "#e67e22", "31–60 d."
             else:                      tramo_c, tramo_t = "#f39c12", "1–30 d."
+            dias_atraso = int(inv.get("dias_atraso", 0))
+            dias_cell = (f'<strong style="color:{tramo_c}">{dias_atraso} días</strong> '
+                         f'<span style="color:{tramo_c};font-size:10px">({tramo_t})</span>'
+                         if dias_atraso > 0 else tramo_t)
             client_rows += (
                 f'<tr style="background:#fff">'
                 f'<td style="{td};padding-left:24px;color:#888;font-size:11px">📄</td>'
                 f'<td style="{td};font-size:11px;color:#555">Fact. {inv["factura"] or "—"}</td>'
                 f'<td style="{td};font-size:11px;color:#888">{inv["emision"] or "—"}</td>'
                 f'<td style="{td};font-size:11px;color:#888" colspan="2">{inv["vencimiento"] or "—"}</td>'
-                f'<td colspan="4" style="{td};text-align:center;font-size:11px;color:{tramo_c};font-weight:700">{tramo_t}</td>'
+                f'<td colspan="4" style="{td};text-align:center;font-size:11px">{dias_cell}</td>'
                 f'<td style="{td_r};font-size:11px;font-weight:700">{fmt_clp(monto_v)}</td>'
                 f'<td colspan="2"></td>'
                 f'</tr>'
@@ -919,15 +931,24 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
               <td class="num">{fmt_clp(c['d61_90']) if c['d61_90'] else '—'}</td>
               <td class="num">{fmt_clp(c['d90plus']) if c['d90plus'] else '—'}</td>
               <td class="num bold">{fmt_clp(c['vencido'])}</td>
-              <td class="num">{c['dias_calle']:.0f} d.</td>
+              <td class="num">{c['dias_calle']:.0f} días</td>
               <td>{rb}</td>
             </tr>"""
             for inv in c.get("invoices", []):
                 vencido_inv = inv["d1_30"]+inv["d31_60"]+inv["d61_90"]+inv["d90plus"]
+                if inv["d90plus"] > 0:   _tc, _tb = "#7b241c", "⛔ +90d"
+                elif inv["d61_90"] > 0:  _tc, _tb = "#c0392b", "🔴 61-90d"
+                elif inv["d31_60"] > 0:  _tc, _tb = "#e67e22", "🟠 31-60d"
+                elif inv["d1_30"] > 0:   _tc, _tb = "#f39c12", "🟡 1-30d"
+                else:                    _tc, _tb = "#888", "—"
+                _da = int(inv.get("dias_atraso", 0))
+                _dc = (f'<strong style="color:{_tc}">{_da} días</strong> '
+                       f'<span style="font-size:10px;color:{_tc}">{_tb}</span>'
+                       if _da > 0 and _tc != "#888" else _tb)
                 sin_client_rows += f"""
             <tr class="inv-row">
               <td colspan="2"><span class="inv-cell">↳ Fac. <strong>{inv['factura']}</strong> &nbsp; Emis: {inv['emision']} &nbsp; Venc: {inv['vencimiento']}</span></td>
-              <td colspan="2"></td>
+              <td class="inv-cell" colspan="2">{_dc}</td>
               <td class="num inv-cell">{fmt_clp(inv['d1_30']) if inv['d1_30'] else '—'}</td>
               <td class="num inv-cell">{fmt_clp(inv['d31_60']) if inv['d31_60'] else '—'}</td>
               <td class="num inv-cell">{fmt_clp(inv['d61_90']) if inv['d61_90'] else '—'}</td>
@@ -968,16 +989,27 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
             inv_rows = ""
             for inv in c.get("invoices", []):
                 vencido_inv = inv["d1_30"] + inv["d31_60"] + inv["d61_90"] + inv["d90plus"]
-                tramo = ("🟡 1-30d" if inv["d1_30"] > 0 else
-                         "🟠 31-60d" if inv["d31_60"] > 0 else
-                         "🔴 61-90d" if inv["d61_90"] > 0 else "⛔ +90d")
+                if inv["d90plus"] > 0:
+                    tramo_color, tramo_badge = "#7b241c", "⛔ +90d"
+                elif inv["d61_90"] > 0:
+                    tramo_color, tramo_badge = "#c0392b", "🔴 61-90d"
+                elif inv["d31_60"] > 0:
+                    tramo_color, tramo_badge = "#e67e22", "🟠 31-60d"
+                elif inv["d1_30"] > 0:
+                    tramo_color, tramo_badge = "#f39c12", "🟡 1-30d"
+                else:
+                    tramo_color, tramo_badge = "#888", "—"
+                dias_atraso = int(inv.get("dias_atraso", 0))
+                dias_cell = (f'<strong style="color:{tramo_color}">{dias_atraso} días</strong> '
+                             f'<span style="font-size:10px;color:{tramo_color}">{tramo_badge}</span>'
+                             if dias_atraso > 0 and tramo_color != "#888" else tramo_badge)
                 inv_rows += f"""
                 <tr class="inv-row" id="inv-{uid}">
                   <td></td>
                   <td class="inv-cell">↳ Fac. <strong>{inv['factura']}</strong></td>
                   <td class="inv-cell">{inv['emision']}</td>
                   <td class="inv-cell">{inv['vencimiento']}</td>
-                  <td class="inv-cell">{tramo}</td>
+                  <td class="inv-cell">{dias_cell}</td>
                   <td class="num inv-cell">{fmt_clp(inv['d1_30']) if inv['d1_30'] else '—'}</td>
                   <td class="num inv-cell">{fmt_clp(inv['d31_60']) if inv['d31_60'] else '—'}</td>
                   <td class="num inv-cell">{fmt_clp(inv['d61_90']) if inv['d61_90'] else '—'}</td>
@@ -1000,7 +1032,7 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
               <td class="num">{fmt_clp(c['d61_90']) if c['d61_90'] else '—'}</td>
               <td class="num">{fmt_clp(c['d90plus']) if c['d90plus'] else '—'}</td>
               <td class="num bold">{fmt_clp(c['vencido'])}</td>
-              <td class="num">{c['dias_calle']:.0f} d.</td>
+              <td class="num">{c['dias_calle']:.0f} días</td>
               <td>{rb}</td>
               <td class="num muted">{len(c.get('invoices',[]))} fac.</td>
             </tr>{inv_rows}"""
