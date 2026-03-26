@@ -739,7 +739,7 @@ KROSS_LOGO_URL = "https://raw.githubusercontent.com/CarlosKross/cxc-dashboard/ma
 def generate_client_collection_email(cliente, rut, ejecutivo, facturas, total_vencido, report_date):
     """Genera email de cobranza para enviar directamente al cliente."""
     logo_html = (f'<img src="{KROSS_LOGO_URL}" '
-                 f'width="70" height="70" style="border-radius:50%;flex-shrink:0" '
+                 f'width="80" height="80" style="flex-shrink:0;display:block" '
                  f'alt="Cervecería Kross"/>')
     inv_rows = ""
     for inv in facturas:
