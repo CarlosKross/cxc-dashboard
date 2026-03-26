@@ -211,7 +211,6 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
         else:
             fantasy_lookup = {}
 
-        # Write uploaded CxC to temp file (preserve extension)
         ext = ".xls" if cxc_file.name.lower().endswith(".xls") else ".xlsx"
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             tmp.write(cxc_file.read())
@@ -229,25 +228,20 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
                 s = unicodedata.normalize("NFD", str(s).strip().lower())
                 return "".join(c for c in s if unicodedata.category(c) != "Mn")
 
-            # ── Detección de formato ──────────────────────────────────────────
             is_analisis = any(
                 "analisis" in norm_sheet(s) or "deuda" in norm_sheet(s)
                 for s in available_sheets
             )
 
             if is_analisis:
-                # Nuevo formato: una sola hoja, sin columna Ejecutivo
                 exec_lookup = load_exec_from_sheets(GOOGLE_SHEET_URL) if GOOGLE_SHEET_URL else {}
-                n_exec_map = len(exec_lookup)
-                if n_exec_map == 0:
+                if len(exec_lookup) == 0:
                     st.warning(
                         "⚠️ No se encontró columna **Ejecutivo** en la base maestra. "
                         "Agrega la columna 'Ejecutivo' al Google Sheet para asignar clientes a ejecutivos. "
                         "Por ahora todos los clientes aparecerán en 'Sin Ejecutivo'."
                     )
-
                 parsed = parse_analisis_deuda(xls, exec_lookup, fantasy_lookup)
-
                 for exec_name, (summary, rows) in parsed.items():
                     if exec_name == "Sin Ejecutivo":
                         sin_exec_rows = rows
@@ -255,7 +249,6 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
                         kpis = build_exec_kpis(summary, rows, exec_name, fantasy_lookup)
                         exec_data.append(kpis)
             else:
-                # Formato anterior: una hoja por ejecutivo
                 candidates = [
                     s for s in available_sheets
                     if norm_sheet(s) not in NON_EXEC_SHEETS
@@ -273,134 +266,140 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
             xls.close()
 
             if not exec_data:
-                if candidates:
-                    st.error(
-                        f"Hojas encontradas: {candidates}  \n"
-                        "Ninguna tiene el formato esperado (debe incluir una fila con columna RUT)."
-                    )
-                else:
-                    st.error(f"No se encontraron hojas de ejecutivos. Hojas disponibles: {available_sheets}")
+                st.error(f"No se encontraron hojas de ejecutivos. Hojas disponibles: {available_sheets}")
             else:
                 for w in warnings:
                     st.warning(w)
 
-                total_cartera = sum(e["total_cartera"] for e in exec_data)
-                total_vencido = sum(e["vencido"] for e in exec_data)
-                pct = total_vencido / total_cartera * 100 if total_cartera else 0
-
-                st.success(f"✅ {len(exec_data)} ejecutivos procesados")
-
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Total Cartera",  f"${total_cartera/1_000_000:.1f}M")
-                col2.metric("Total Vencido",  f"${total_vencido/1_000_000:.1f}M")
-                col3.metric("% Vencido",      f"{pct:.1f}%")
-
                 fecha = report_date.strip() or "s/f"
-                html = generate_html(exec_data, fecha, sin_exec_rows=sin_exec_rows or None)
+                html  = generate_html(exec_data, fecha, sin_exec_rows=sin_exec_rows or None)
                 filename = f"CXC_Dashboard_{fecha.replace('/', '-')}.html"
 
-                st.download_button(
-                    label="⬇️ Descargar Dashboard HTML",
-                    data=html.encode("utf-8"),
-                    file_name=filename,
-                    mime="text/html",
-                    type="primary",
-                )
-
-                # ── Envío de correos ──────────────────────────────────────────
-                st.divider()
-                st.subheader("📧 Enviar Informes por Correo")
-
-                email_cfg = load_email_config()
-                exec_emails  = email_cfg.get("ejecutivos", {})
-                jefaturas    = email_cfg.get("jefaturas", [])
-                smtp_cfg     = email_cfg.get("smtp", {})
-                smtp_ok      = bool(smtp_cfg.get("user") and smtp_cfg.get("password")
-                                    and "xxxx" not in smtp_cfg.get("password", ""))
-
-                if not smtp_ok:
-                    st.warning(
-                        "**El envío de correos no está configurado.**  \n"
-                        "Para habilitarlo, ve a tu app en **share.streamlit.io → Settings → Secrets** "
-                        "y agrega las credenciales SMTP. Contacta al administrador del sistema."
-                    )
-                else:
-                    col_a, col_b = st.columns(2)
-                    send_exec  = col_a.checkbox("Informe individual a cada ejecutivo", value=True)
-                    send_jefes = col_b.checkbox("Informe general a jefaturas", value=True)
-
-                    with st.expander("Ver / editar destinatarios"):
-                        st.markdown("**Ejecutivos**")
-                        edited_exec = {}
-                        for e in exec_data:
-                            default = exec_emails.get(e["nombre"], "")
-                            edited_exec[e["nombre"]] = st.text_input(
-                                e["nombre"], value=default, key=f"mail_{e['nombre']}"
-                            )
-                        st.markdown("**Jefaturas**")
-                        jefaturas_str = st.text_area(
-                            "Un correo por línea", value="\n".join(jefaturas), height=80
-                        )
-
-                    if st.button("📤 Enviar ahora", type="primary"):
-                        jefes_list = [j.strip() for j in jefaturas_str.splitlines() if j.strip()]
-                        errors = []
-                        sent  = []
-
-                        with st.spinner("Enviando correos…"):
-                            # Individuales a ejecutivos
-                            if send_exec:
-                                for e in exec_data:
-                                    to = edited_exec.get(e["nombre"], "").strip()
-                                    if not to:
-                                        errors.append(f"Sin email para {e['nombre']}")
-                                        continue
-                                    try:
-                                        ind_html = generate_individual_html(e, fecha)
-                                        body = (
-                                            f"<p>Hola {e['nombre'].split()[0]},</p>"
-                                            f"<p>Adjunto encontrarás tu informe de Cuentas por Cobrar al {fecha}.</p>"
-                                            f"<p>Saludos,<br>Cervecería Kross</p>"
-                                        )
-                                        send_email(
-                                            email_cfg, [to],
-                                            f"Informe CxC — {e['nombre']} — {fecha}",
-                                            body,
-                                            ind_html,
-                                            f"CxC_{e['nombre'].replace(' ','_')}_{fecha.replace('/','_')}.html",
-                                        )
-                                        sent.append(to)
-                                    except Exception as ex:
-                                        errors.append(f"{e['nombre']}: {ex}")
-
-                            # General a jefaturas
-                            if send_jefes and jefes_list:
-                                try:
-                                    body = (
-                                        f"<p>Adjunto el informe general de Cuentas por Cobrar al {fecha}.</p>"
-                                        f"<p>Saludos,<br>Cervecería Kross</p>"
-                                    )
-                                    send_email(
-                                        email_cfg, jefes_list,
-                                        f"Dashboard CxC General — {fecha}",
-                                        body,
-                                        html,
-                                        filename,
-                                    )
-                                    sent += jefes_list
-                                except Exception as ex:
-                                    errors.append(f"Jefaturas: {ex}")
-
-                        if sent:
-                            st.success(f"✅ Correos enviados a: {', '.join(sent)}")
-                        for err in errors:
-                            st.error(err)
+                # Guardar en session_state para que persista al hacer clic en Enviar
+                st.session_state["exec_data"]     = exec_data
+                st.session_state["sin_exec_rows"] = sin_exec_rows
+                st.session_state["html"]          = html
+                st.session_state["filename"]      = filename
+                st.session_state["fecha"]         = fecha
 
         finally:
             try:
                 os.unlink(cxc_tmp)
             except Exception:
                 pass
+
+# ── Mostrar resultados y correos (persiste entre reruns) ──────────────────────
+if "exec_data" in st.session_state:
+    exec_data     = st.session_state["exec_data"]
+    sin_exec_rows = st.session_state["sin_exec_rows"]
+    html          = st.session_state["html"]
+    filename      = st.session_state["filename"]
+    fecha         = st.session_state["fecha"]
+
+    total_cartera = sum(e["total_cartera"] for e in exec_data)
+    total_vencido = sum(e["vencido"] for e in exec_data)
+    pct = total_vencido / total_cartera * 100 if total_cartera else 0
+
+    st.success(f"✅ {len(exec_data)} ejecutivos procesados")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Cartera", f"${total_cartera/1_000_000:.1f}M")
+    col2.metric("Total Vencido", f"${total_vencido/1_000_000:.1f}M")
+    col3.metric("% Vencido",     f"{pct:.1f}%")
+
+    st.download_button(
+        label="⬇️ Descargar Dashboard HTML",
+        data=html.encode("utf-8"),
+        file_name=filename,
+        mime="text/html",
+        type="primary",
+    )
+
+    # ── Envío de correos ──────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("📧 Enviar Informes por Correo")
+
+    email_cfg   = load_email_config()
+    exec_emails = email_cfg.get("ejecutivos", {})
+    jefaturas   = email_cfg.get("jefaturas", [])
+    smtp_cfg    = email_cfg.get("smtp", {})
+    smtp_ok     = bool(smtp_cfg.get("user") and smtp_cfg.get("password")
+                       and "xxxx" not in smtp_cfg.get("password", ""))
+
+    if not smtp_ok:
+        st.warning(
+            "**El envío de correos no está configurado.**  \n"
+            "Para habilitarlo, ve a tu app en **share.streamlit.io → Settings → Secrets** "
+            "y agrega las credenciales SMTP. Contacta al administrador del sistema."
+        )
+    else:
+        col_a, col_b = st.columns(2)
+        send_exec  = col_a.checkbox("Informe individual a cada ejecutivo", value=True)
+        send_jefes = col_b.checkbox("Informe general a jefaturas", value=True)
+
+        with st.expander("Ver / editar destinatarios"):
+            st.markdown("**Ejecutivos**")
+            edited_exec = {}
+            for e in exec_data:
+                default = exec_emails.get(e["nombre"], "")
+                edited_exec[e["nombre"]] = st.text_input(
+                    e["nombre"], value=default, key=f"mail_{e['nombre']}"
+                )
+            st.markdown("**Jefaturas**")
+            jefaturas_str = st.text_area(
+                "Un correo por línea", value="\n".join(jefaturas), height=80
+            )
+
+        if st.button("📤 Enviar ahora", type="primary"):
+            jefes_list = [j.strip() for j in jefaturas_str.splitlines() if j.strip()]
+            errors = []
+            sent   = []
+
+            with st.spinner("Enviando correos…"):
+                if send_exec:
+                    for e in exec_data:
+                        to = edited_exec.get(e["nombre"], "").strip()
+                        if not to:
+                            errors.append(f"Sin email para {e['nombre']}")
+                            continue
+                        try:
+                            ind_html = generate_individual_html(e, fecha)
+                            body = (
+                                f"<p>Hola {e['nombre'].split()[0]},</p>"
+                                f"<p>Adjunto encontrarás tu informe de Cuentas por Cobrar al {fecha}.</p>"
+                                f"<p>Saludos,<br>Cervecería Kross</p>"
+                            )
+                            send_email(
+                                email_cfg, [to],
+                                f"Informe CxC — {e['nombre']} — {fecha}",
+                                body,
+                                ind_html,
+                                f"CxC_{e['nombre'].replace(' ','_')}_{fecha.replace('/','_')}.html",
+                            )
+                            sent.append(f"{e['nombre']} → {to}")
+                        except Exception as ex:
+                            errors.append(f"{e['nombre']}: {ex}")
+
+                if send_jefes and jefes_list:
+                    try:
+                        body = (
+                            f"<p>Adjunto el informe general de Cuentas por Cobrar al {fecha}.</p>"
+                            f"<p>Saludos,<br>Cervecería Kross</p>"
+                        )
+                        send_email(
+                            email_cfg, jefes_list,
+                            f"Dashboard CxC General — {fecha}",
+                            body,
+                            html,
+                            filename,
+                        )
+                        sent += [f"Jefaturas → {j}" for j in jefes_list]
+                    except Exception as ex:
+                        errors.append(f"Jefaturas: {ex}")
+
+            if sent:
+                st.success("✅ Correos enviados:\n" + "\n".join(f"- {s}" for s in sent))
+            for err in errors:
+                st.error(err)
 
 st.divider()
 st.caption("Cervecería Kross · Dashboard CxC")
