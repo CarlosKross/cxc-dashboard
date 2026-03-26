@@ -154,19 +154,142 @@ def load_fantasy_from_excel(file_bytes):
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Dashboard CxC — Kross",
-    page_icon="📊",
+    page_icon="🍺",
     layout="centered",
 )
 
 st.markdown("""
 <style>
-    .block-container { max-width: 760px; padding-top: 2rem; }
-    h1 { color: #1a2e4a; }
-</style>
-""", unsafe_allow_html=True)
+    /* ── Kross Brand Colors ───────────────────────────────── */
+    :root {
+        --kross-yellow: #F5C200;
+        --kross-dark:   #111111;
+        --kross-gray:   #1e1e1e;
+    }
 
-st.title("📊 Dashboard Cuentas por Cobrar")
-st.markdown("Carga el informe Excel de CxC y descarga el dashboard listo para enviar a ejecutivos.")
+    /* Fondo general */
+    .stApp { background-color: #111111; }
+    .block-container { max-width: 780px; padding-top: 0 !important; }
+
+    /* Header de marca */
+    .kross-header {
+        background: #F5C200;
+        padding: 18px 32px 14px;
+        margin: -1rem -1rem 1.5rem -1rem;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .kross-header h1 {
+        color: #111111 !important;
+        font-size: 22px !important;
+        font-weight: 900 !important;
+        letter-spacing: 1px;
+        margin: 0;
+        text-transform: uppercase;
+    }
+    .kross-header .sub {
+        color: #333;
+        font-size: 12px;
+        margin-top: 2px;
+    }
+
+    /* Títulos y texto general */
+    h1, h2, h3 { color: #F5C200 !important; }
+    p, label, .stMarkdown { color: #e0e0e0 !important; }
+
+    /* Botón primario → amarillo Kross */
+    .stButton > button[kind="primary"] {
+        background: #F5C200 !important;
+        color: #111 !important;
+        font-weight: 800 !important;
+        border: none !important;
+        border-radius: 6px !important;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background: #d4a800 !important;
+    }
+
+    /* Botón secundario */
+    .stButton > button {
+        background: #222 !important;
+        color: #F5C200 !important;
+        border: 1px solid #F5C200 !important;
+        border-radius: 6px !important;
+    }
+
+    /* File uploader */
+    [data-testid="stFileUploader"] {
+        border: 2px dashed #F5C200 !important;
+        border-radius: 8px !important;
+        background: #1a1a1a !important;
+    }
+
+    /* Inputs */
+    .stTextInput input, .stTextArea textarea {
+        background: #1e1e1e !important;
+        color: #fff !important;
+        border: 1px solid #444 !important;
+        border-radius: 6px !important;
+    }
+    .stTextInput input:focus, .stTextArea textarea:focus {
+        border-color: #F5C200 !important;
+    }
+
+    /* Métricas */
+    [data-testid="stMetric"] {
+        background: #1e1e1e;
+        border-radius: 8px;
+        padding: 12px 16px;
+        border-left: 4px solid #F5C200;
+    }
+    [data-testid="stMetricLabel"] { color: #aaa !important; }
+    [data-testid="stMetricValue"] { color: #F5C200 !important; }
+
+    /* Alertas */
+    .stSuccess { background: #1a2e1a !important; border-color: #2ecc71 !important; }
+    .stWarning { background: #2e2a1a !important; border-color: #F5C200 !important; }
+    .stError   { background: #2e1a1a !important; border-color: #e74c3c !important; }
+
+    /* Expander */
+    [data-testid="stExpander"] {
+        background: #1e1e1e !important;
+        border: 1px solid #333 !important;
+        border-radius: 8px !important;
+    }
+
+    /* Divider */
+    hr { border-color: #333 !important; }
+
+    /* Caption */
+    .stCaption { color: #666 !important; }
+
+    /* Checkbox */
+    .stCheckbox label { color: #e0e0e0 !important; }
+
+    /* Subheader */
+    .stSubheader { color: #F5C200 !important; }
+
+    /* Download button */
+    [data-testid="stDownloadButton"] > button {
+        background: #F5C200 !important;
+        color: #111 !important;
+        font-weight: 800 !important;
+        border: none !important;
+        border-radius: 6px !important;
+        text-transform: uppercase;
+    }
+</style>
+
+<div class="kross-header">
+  <div>
+    <h1>🍺 Dashboard Cuentas por Cobrar</h1>
+    <div class="sub">Cervecería Kross · Gestión de Cobranza</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── Upload CxC file ───────────────────────────────────────────────────────────
 cxc_file = st.file_uploader(

@@ -593,7 +593,7 @@ def generate_individual_html(e, report_date=""):
           <td class="num" style="color:#e67e22">{fmt_clp(c['d31_60'])}</td>
           <td class="num" style="color:#c0392b">{fmt_clp(c['d61_90'])}</td>
           <td class="num" style="color:#7b241c">{fmt_clp(c['d90plus'])}</td>
-          <td class="num bold" style="color:#1a2e4a">{fmt_clp(c['vencido'])}</td>
+          <td class="num bold" style="color:#111111">{fmt_clp(c['vencido'])}</td>
           <td class="num">{c['dias_calle']:.0f} días</td>
           <td>{rb}</td>
           <td class="num" style="color:#888;font-size:11px">{ninv if ninv else '—'}</td>
@@ -641,18 +641,18 @@ def generate_individual_html(e, report_date=""):
 <style>
   *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#222;font-size:13px}}
-  .header{{background:linear-gradient(135deg,#1a2e4a,#2d5a8e);color:#fff;padding:24px 32px}}
+  .header{{background:linear-gradient(135deg,#111111,#222222);color:#F5C200;padding:24px 32px}}
   .header h1{{font-size:20px;font-weight:700}}
-  .header .sub{{font-size:12px;color:#b0c4de;margin-top:4px}}
+  .header .sub{{font-size:12px;color:#999999;margin-top:4px}}
   .kpis{{display:flex;gap:14px;padding:20px 32px;flex-wrap:wrap}}
   .kpi{{background:#fff;border-radius:10px;padding:16px 20px;flex:1;min-width:130px;
         box-shadow:0 2px 8px rgba(0,0,0,.07);border-top:4px solid {color}}}
   .kpi.red{{border-top-color:#e74c3c}}.kpi.yellow{{border-top-color:#f39c12}}.kpi.green{{border-top-color:#27ae60}}
   .kpi .label{{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px}}
-  .kpi .value{{font-size:18px;font-weight:700;margin-top:5px;color:#1a2e4a}}
+  .kpi .value{{font-size:18px;font-weight:700;margin-top:5px;color:#111111}}
   .kpi.red .value{{color:#e74c3c}}.kpi.yellow .value{{color:#f39c12}}.kpi.green .value{{color:#27ae60}}
   .section{{padding:0 32px 32px}}
-  .title{{font-size:13px;font-weight:700;color:#1a2e4a;text-transform:uppercase;
+  .title{{font-size:13px;font-weight:700;color:#111111;text-transform:uppercase;
           letter-spacing:.5px;margin-bottom:12px;padding-left:8px;border-left:4px solid {color}}}
   .progress-wrap{{display:flex;align-items:center;gap:12px;padding:12px 32px 20px}}
   .track{{flex:1;height:10px;background:#e8edf3;border-radius:5px;overflow:hidden}}
@@ -660,11 +660,11 @@ def generate_individual_html(e, report_date=""):
   .plabel{{font-size:12px;color:#555;min-width:120px}}
   table{{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;
          overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);font-size:12px}}
-  thead tr{{background:#1a2e4a;color:#fff}}
+  thead tr{{background:#111111;color:#F5C200}}
   th{{padding:9px 11px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}}
   td{{padding:8px 11px;border-bottom:1px solid #f0f2f5;vertical-align:middle}}
   .client-row:hover{{background:#f0f4fa!important}}
-  .client-name{{font-weight:600;color:#1a2e4a}}
+  .client-name{{font-weight:600;color:#111111}}
   .num{{text-align:right;font-variant-numeric:tabular-nums}}
   .bold{{font-weight:700}}
   .badge{{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;text-transform:uppercase}}
@@ -747,7 +747,7 @@ def generate_email_body(e, report_date=""):
     color = COLORS.get(e["nombre"], "#4F8EF7")
     sc_color = "#e74c3c" if pct >= 30 else "#f39c12" if pct >= 15 else "#27ae60"
 
-    def kpi_card(label, value, border_color="#ddd", val_color="#1a2e4a"):
+    def kpi_card(label, value, border_color="#ddd", val_color="#111111"):
         return (f'<td style="padding:12px 16px;background:#fff;border-radius:8px;'
                 f'border-top:4px solid {border_color};min-width:110px;text-align:center;'
                 f'box-shadow:0 2px 6px rgba(0,0,0,.07);vertical-align:top">'
@@ -772,7 +772,7 @@ def generate_email_body(e, report_date=""):
 
     # Filas de clientes + facturas (todas visibles)
     client_rows = ""
-    th = ('background:#1a2e4a;color:#fff;padding:8px 10px;text-align:left;'
+    th = ('background:#111111;color:#F5C200;padding:8px 10px;text-align:left;'
           'font-size:10px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap')
     th_r = th + ';text-align:right'
 
@@ -787,7 +787,7 @@ def generate_email_body(e, report_date=""):
 
         client_rows += (
             f'<tr style="background:#f7f9fc">'
-            f'<td style="{td};font-weight:700;color:#1a2e4a" colspan="2">{c["cliente"]}</td>'
+            f'<td style="{td};font-weight:700;color:#111111" colspan="2">{c["cliente"]}</td>'
             f'<td style="{td};font-size:10px;color:#888">{c["rut"]}</td>'
             f'<td style="{td_r}">{fmt_clp(c["no_vencido"])}</td>'
             f'<td style="{td_r};font-weight:700">{fmt_clp(c["total"])}</td>'
@@ -836,9 +836,9 @@ def generate_email_body(e, report_date=""):
 <div style="max-width:900px;margin:0 auto;padding:20px">
 
   <!-- Header -->
-  <div style="background:linear-gradient(135deg,#1a2e4a,#2d5a8e);color:#fff;padding:24px 32px;border-radius:10px 10px 0 0">
+  <div style="background:linear-gradient(135deg,#111111,#222222);color:#F5C200;padding:24px 32px;border-radius:10px 10px 0 0">
     <div style="font-size:20px;font-weight:700">Informe Cuentas por Cobrar — {e['nombre']}</div>
-    <div style="font-size:12px;color:#b0c4de;margin-top:4px">Fecha: {report_date} &nbsp;|&nbsp; Uso interno — confidencial</div>
+    <div style="font-size:12px;color:#999999;margin-top:4px">Fecha: {report_date} &nbsp;|&nbsp; Uso interno — confidencial</div>
   </div>
 
   <!-- KPIs -->
@@ -1165,16 +1165,16 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
   body {{ font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; font-size: 13px; }}
 
   /* HEADER */
-  .header {{ background: linear-gradient(135deg, #1a2e4a 0%, #2d5a8e 100%); color: #fff; padding: 24px 32px; }}
+  .header {{ background: linear-gradient(135deg, #111111 0%, #222222 100%); color: #F5C200; padding: 24px 32px; }}
   .header h1 {{ font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }}
-  .header .subtitle {{ font-size: 12px; color: #b0c4de; margin-top: 4px; }}
+  .header .subtitle {{ font-size: 12px; color: #999999; margin-top: 4px; }}
 
   /* GLOBAL KPIs */
   .global-kpis {{ display: flex; gap: 16px; padding: 20px 32px; flex-wrap: wrap; }}
   .gkpi {{ background: #fff; border-radius: 10px; padding: 18px 24px; flex: 1; min-width: 160px;
-           box-shadow: 0 2px 8px rgba(0,0,0,.07); border-top: 4px solid #2d5a8e; }}
+           box-shadow: 0 2px 8px rgba(0,0,0,.07); border-top: 4px solid #222222; }}
   .gkpi .label {{ font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: .5px; }}
-  .gkpi .value {{ font-size: 22px; font-weight: 700; margin-top: 6px; color: #1a2e4a; }}
+  .gkpi .value {{ font-size: 22px; font-weight: 700; margin-top: 6px; color: #111111; }}
   .gkpi.danger {{ border-top-color: #e74c3c; }}
   .gkpi.danger .value {{ color: #e74c3c; }}
   .gkpi.warning {{ border-top-color: #f39c12; }}
@@ -1186,30 +1186,30 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
   .charts-row {{ display: flex; gap: 16px; padding: 0 32px 20px; flex-wrap: wrap; }}
   .chart-box {{ background: #fff; border-radius: 10px; padding: 20px; flex: 1; min-width: 320px;
                box-shadow: 0 2px 8px rgba(0,0,0,.07); }}
-  .chart-box h3 {{ font-size: 13px; font-weight: 600; color: #1a2e4a; margin-bottom: 14px;
+  .chart-box h3 {{ font-size: 13px; font-weight: 600; color: #111111; margin-bottom: 14px;
                   text-transform: uppercase; letter-spacing: .5px; }}
   .chart-box canvas {{ max-height: 260px; }}
 
   /* RANKING TABLE */
   .ranking-wrap {{ padding: 0 32px 20px; }}
-  .section-title {{ font-size: 14px; font-weight: 700; color: #1a2e4a; text-transform: uppercase;
+  .section-title {{ font-size: 14px; font-weight: 700; color: #111111; text-transform: uppercase;
                    letter-spacing: .5px; margin-bottom: 12px; padding-left: 8px;
-                   border-left: 4px solid #2d5a8e; }}
+                   border-left: 4px solid #222222; }}
   .rank-table {{ width: 100%; border-collapse: collapse; background: #fff;
                 border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.07); }}
-  .rank-table thead tr {{ background: #1a2e4a; color: #fff; }}
+  .rank-table thead tr {{ background: #111111; color: #F5C200; }}
   .rank-table th {{ padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
                    font-weight: 600; }}
   .rank-table td {{ padding: 10px 12px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }}
   .rank-table tbody tr:hover {{ background: #f7f9fc; }}
-  .rank-num {{ font-weight: 700; color: #2d5a8e; font-size: 14px; }}
+  .rank-num {{ font-weight: 700; color: #222222; font-size: 14px; }}
   .dot {{ display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }}
 
   /* EXECUTIVE SECTIONS */
   .exec-sections {{ padding: 0 32px 32px; display: flex; flex-direction: column; gap: 20px; }}
   .exec-section {{ background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07); overflow: hidden; }}
   .exec-header {{ padding: 18px 24px; background: #f7f9fc; }}
-  .exec-name {{ font-size: 16px; font-weight: 700; color: #1a2e4a; margin-bottom: 14px; }}
+  .exec-name {{ font-size: 16px; font-weight: 700; color: #111111; margin-bottom: 14px; }}
   .exec-kpis {{ display: flex; flex-wrap: wrap; gap: 10px; }}
   .kpi-box {{ background: #fff; border-radius: 8px; padding: 10px 16px; min-width: 120px;
              box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid #e8edf3; }}
@@ -1217,7 +1217,7 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
   .kpi-box.card-yellow {{ border-color: #f39c12; background: #fdf7ec; }}
   .kpi-box.card-green {{ border-color: #27ae60; background: #f0faf4; }}
   .kpi-label {{ font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: .4px; }}
-  .kpi-value {{ font-size: 15px; font-weight: 700; color: #1a2e4a; margin-top: 3px; }}
+  .kpi-value {{ font-size: 15px; font-weight: 700; color: #111111; margin-top: 3px; }}
   .kpi-value.green {{ color: #27ae60; }}
   .kpi-value.orange {{ color: #f39c12; }}
   .kpi-value.red {{ color: #e74c3c; }}
@@ -1231,12 +1231,12 @@ def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
   /* CLIENT TABLE */
   .client-table-wrap {{ padding: 0 24px 20px; overflow-x: auto; }}
   .client-table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
-  .client-table thead tr {{ background: #2d5a8e; color: #fff; }}
+  .client-table thead tr {{ background: #222222; color: #fff; }}
   .client-table th {{ padding: 8px 10px; text-align: left; font-weight: 600; font-size: 11px;
                      text-transform: uppercase; letter-spacing: .3px; }}
   .client-table td {{ padding: 7px 10px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }}
   .client-table tbody tr:hover {{ background: #f7f9fc; }}
-  .client-name {{ font-weight: 600; color: #1a2e4a; }}
+  .client-name {{ font-weight: 600; color: #111111; }}
   .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
   .bold {{ font-weight: 700; }}
   .muted {{ color: #999; }}
