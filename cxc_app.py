@@ -14,6 +14,7 @@ from pathlib import Path
 from cxc_dashboard import (
     parse_executive_sheet,
     parse_sin_ejecutivo,
+    parse_analisis_deuda,
     build_exec_kpis,
     generate_html,
     generate_individual_html,
@@ -93,14 +94,41 @@ def _parse_fantasy_df(df):
     return lookup
 
 
+def _parse_exec_df(df):
+    """Extrae {rut_normalizado: ejecutivo} desde el DataFrame de la base maestra."""
+    rut_col  = next((c for c in df.columns if "rut"       in c.lower()), None)
+    exec_col = next((c for c in df.columns if "ejecutivo" in c.lower()), None)
+    if not rut_col or not exec_col:
+        return {}
+    lookup = {}
+    for _, row in df.iterrows():
+        rut  = str(row[rut_col]).strip()
+        exec_name = str(row[exec_col]).strip()
+        if rut and exec_name and exec_name not in ("nan", ""):
+            lookup[normalize_rut(rut)] = exec_name
+    return lookup
+
+
 @st.cache_data(ttl=300)   # refresca cada 5 min
 def load_fantasy_from_sheets(url):
     df = pd.read_csv(url, dtype=str)
-    # Si los headers reales están en la primera fila de datos, releer saltando esa fila
     rut_col = next((c for c in df.columns if "rut" in c.lower()), None)
     if not rut_col:
         df = pd.read_csv(url, dtype=str, skiprows=1)
     return _parse_fantasy_df(df)
+
+
+@st.cache_data(ttl=300)
+def load_exec_from_sheets(url):
+    """Carga {rut: ejecutivo} desde la columna 'Ejecutivo' de la base maestra."""
+    try:
+        df = pd.read_csv(url, dtype=str)
+        rut_col = next((c for c in df.columns if "rut" in c.lower()), None)
+        if not rut_col:
+            df = pd.read_csv(url, dtype=str, skiprows=1)
+        return _parse_exec_df(df)
+    except Exception:
+        return {}
 
 
 def load_fantasy_from_csv(path):
@@ -183,8 +211,9 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
         else:
             fantasy_lookup = {}
 
-        # Write uploaded CxC to temp file
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        # Write uploaded CxC to temp file (preserve extension)
+        ext = ".xls" if cxc_file.name.lower().endswith(".xls") else ".xlsx"
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             tmp.write(cxc_file.read())
             cxc_tmp = tmp.name
 
@@ -192,24 +221,55 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
             xls = pd.ExcelFile(cxc_tmp)
             available_sheets = xls.sheet_names
             exec_data = []
-            warnings = []
+            warnings  = []
+            sin_exec_rows = []
 
-            candidates = [
-                s for s in available_sheets
-                if s.strip().lower().replace("ñ", "n").replace("é", "e")
-                   not in NON_EXEC_SHEETS
-                and not s.strip().lower().startswith("resumen")
-            ]
+            import unicodedata
+            def norm_sheet(s):
+                s = unicodedata.normalize("NFD", str(s).strip().lower())
+                return "".join(c for c in s if unicodedata.category(c) != "Mn")
 
-            for sheet in candidates:
-                summary, rows = parse_executive_sheet(xls, sheet)
-                if rows:
-                    kpis = build_exec_kpis(summary, rows, sheet, fantasy_lookup)
-                    exec_data.append(kpis)
-                else:
-                    warnings.append(f"Sin datos en hoja: **{sheet}**")
+            # ── Detección de formato ──────────────────────────────────────────
+            is_analisis = any(
+                "analisis" in norm_sheet(s) or "deuda" in norm_sheet(s)
+                for s in available_sheets
+            )
 
-            sin_exec_rows = parse_sin_ejecutivo(xls)
+            if is_analisis:
+                # Nuevo formato: una sola hoja, sin columna Ejecutivo
+                exec_lookup = load_exec_from_sheets(GOOGLE_SHEET_URL) if GOOGLE_SHEET_URL else {}
+                n_exec_map = len(exec_lookup)
+                if n_exec_map == 0:
+                    st.warning(
+                        "⚠️ No se encontró columna **Ejecutivo** en la base maestra. "
+                        "Agrega la columna 'Ejecutivo' al Google Sheet para asignar clientes a ejecutivos. "
+                        "Por ahora todos los clientes aparecerán en 'Sin Ejecutivo'."
+                    )
+
+                parsed = parse_analisis_deuda(xls, exec_lookup, fantasy_lookup)
+
+                for exec_name, (summary, rows) in parsed.items():
+                    if exec_name == "Sin Ejecutivo":
+                        sin_exec_rows = rows
+                    elif rows:
+                        kpis = build_exec_kpis(summary, rows, exec_name, fantasy_lookup)
+                        exec_data.append(kpis)
+            else:
+                # Formato anterior: una hoja por ejecutivo
+                candidates = [
+                    s for s in available_sheets
+                    if norm_sheet(s) not in NON_EXEC_SHEETS
+                    and not norm_sheet(s).startswith("resumen")
+                ]
+                for sheet in candidates:
+                    summary, rows = parse_executive_sheet(xls, sheet)
+                    if rows:
+                        kpis = build_exec_kpis(summary, rows, sheet, fantasy_lookup)
+                        exec_data.append(kpis)
+                    else:
+                        warnings.append(f"Sin datos en hoja: **{sheet}**")
+                sin_exec_rows = parse_sin_ejecutivo(xls)
+
             xls.close()
 
             if not exec_data:

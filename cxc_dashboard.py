@@ -294,6 +294,134 @@ def parse_sin_ejecutivo(xls):
     return []
 
 
+def parse_analisis_deuda(xls, exec_lookup=None, fantasy_lookup=None):
+    """Parse ANALISISDEUDA format — single sheet, all invoices, no Ejecutivo column.
+    exec_lookup: {normalized_rut: exec_name} — viene de la base maestra (Google Sheets).
+    Retorna {exec_name: (summary_dict, rows_list)}.
+    """
+    import unicodedata
+    from collections import defaultdict
+
+    def norm_str(s):
+        s = unicodedata.normalize("NFD", str(s).strip().lower())
+        return "".join(c for c in s if unicodedata.category(c) != "Mn")
+
+    # Buscar hoja con "analisis" o "deuda" en el nombre
+    target = None
+    for s in xls.sheet_names:
+        if "analisis" in norm_str(s) or "deuda" in norm_str(s):
+            target = s
+            break
+    if target is None:
+        return {}
+
+    df_raw = pd.read_excel(xls, sheet_name=target, header=None)
+
+    # Buscar fila de encabezado: la que tiene "RUT" o "Rut"
+    header_row = None
+    for i, row in df_raw.iterrows():
+        if any(str(v).strip().upper() == "RUT" for v in row.values):
+            header_row = i
+            break
+    if header_row is None:
+        return {}
+
+    # La fila de grupos está justo antes (tiene "Anterior", "Resto", "Total")
+    group_row = header_row - 1 if header_row > 0 else None
+
+    def clean(v):
+        s = str(v).strip()
+        return "" if s.lower() in ("nan", "") else s
+
+    header_vals = [clean(v) for v in df_raw.iloc[header_row].values]
+    group_vals  = ([clean(v) for v in df_raw.iloc[group_row].values]
+                   if group_row is not None else [""] * len(header_vals))
+
+    # Combinar: usar header_row si tiene valor, sino usar group_row
+    col_names = [h if h else g for h, g in zip(header_vals, group_vals)]
+
+    raw_col_map = {name.upper(): idx for idx, name in enumerate(col_names) if name}
+    col_map = _resolve_cols(raw_col_map)
+
+    required = ["RUT", "CLIENTE", "NO VENCIDO", "1-30 DIAS", "31-60 DIAS", "61-90 DIAS", "> 90 DIAS", "TOTAL"]
+    if not all(c in col_map for c in required):
+        return {}
+
+    factura_idx = col_map.get("N FACTURA")
+    emision_idx = col_map.get("EMISION")
+    vencim_idx  = col_map.get("VENCIMIENTO")
+
+    exec_lookup    = exec_lookup or {}
+    fantasy_lookup = fantasy_lookup or {}
+
+    def safe_float(v):
+        try:   return float(v) if not pd.isna(v) else 0.0
+        except: return 0.0
+
+    def fmt_date(v):
+        if v is None: return ""
+        try:
+            ts = pd.to_datetime(v, errors="coerce", dayfirst=True)
+            return ts.strftime("%d/%m/%Y") if not pd.isna(ts) else str(v).split(" ")[0]
+        except: return str(v).split(" ")[0]
+
+    # Agrupar filas por ejecutivo
+    data = df_raw.iloc[header_row + 1:].copy()
+    data.columns = range(len(data.columns))
+    exec_rows = defaultdict(list)
+
+    for _, row in data.iterrows():
+        rut_val    = row[col_map["RUT"]]
+        client_val = row[col_map["CLIENTE"]]
+        total_val  = row[col_map["TOTAL"]]
+
+        # Saltar filas vacías, totales o "Fin Informe"
+        if pd.isna(rut_val) or str(rut_val).strip().lower() in ("nan", "", "fin informe"):
+            continue
+        if pd.isna(total_val):
+            continue
+
+        rut     = normalize_rut(str(rut_val).strip())
+        cliente = str(client_val).strip() if not pd.isna(client_val) else ""
+        if fantasy_lookup.get(rut):
+            cliente = fantasy_lookup[rut]
+
+        exec_name = exec_lookup.get(rut, "Sin Ejecutivo")
+
+        r = {
+            "rut": rut, "cliente": cliente,
+            "factura": "", "emision": "", "vencimiento": "",
+            "dias_mora":  0.0,
+            "no_vencido": safe_float(row[col_map["NO VENCIDO"]]),
+            "d1_30":      safe_float(row[col_map["1-30 DIAS"]]),
+            "d31_60":     safe_float(row[col_map["31-60 DIAS"]]),
+            "d61_90":     safe_float(row[col_map["61-90 DIAS"]]),
+            "d90plus":    safe_float(row[col_map["> 90 DIAS"]]),
+            "total":      safe_float(row[col_map["TOTAL"]]),
+        }
+        if factura_idx is not None and not pd.isna(row[factura_idx]):
+            try:    r["factura"] = str(int(float(row[factura_idx])))
+            except: r["factura"] = str(row[factura_idx]).strip()
+        if emision_idx is not None:
+            r["emision"] = fmt_date(row[emision_idx])
+        if vencim_idx is not None:
+            r["vencimiento"] = fmt_date(row[vencim_idx])
+
+        exec_rows[exec_name].append(r)
+
+    # Construir resultado con summary por ejecutivo
+    result = {}
+    for exec_name, rows in exec_rows.items():
+        summary = {
+            "TOTAL CARTERA": sum(r["total"] for r in rows),
+            "NO VENCIDO":    sum(r["no_vencido"] for r in rows),
+            "N CLIENTES":    len(set(r["rut"] for r in rows)),
+        }
+        result[exec_name] = (summary, rows)
+
+    return result
+
+
 def aggregate_by_client(rows):
     """Group facturas by client and sum amounts, keeping invoice detail."""
     clients = {}
