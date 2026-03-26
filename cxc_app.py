@@ -19,7 +19,9 @@ from cxc_dashboard import (
     generate_html,
     generate_individual_html,
     generate_email_body,
+    generate_client_collection_email,
     normalize_rut,
+    fmt_clp,
 )
 
 # ── Email helpers ─────────────────────────────────────────────────────────────
@@ -110,6 +112,25 @@ def _parse_exec_df(df):
     return lookup
 
 
+def _parse_email_cobranza_df(df):
+    """Extrae {rut_normalizado: email_cobranza} desde columna AO (índice 40) de la base maestra."""
+    rut_col = next((c for c in df.columns if "rut" in c.lower()), None)
+    if not rut_col:
+        return {}
+    cols = list(df.columns)
+    # Columna AO = índice 40 (base 0)
+    email_col = cols[40] if len(cols) > 40 else None
+    if not email_col:
+        return {}
+    lookup = {}
+    for _, row in df.iterrows():
+        rut   = str(row[rut_col]).strip()
+        email = str(row[email_col]).strip()
+        if rut and email and email not in ("nan", ""):
+            lookup[normalize_rut(rut)] = email
+    return lookup
+
+
 @st.cache_data(ttl=300)   # refresca cada 5 min
 def load_fantasy_from_sheets(url):
     df = pd.read_csv(url, dtype=str)
@@ -128,6 +149,19 @@ def load_exec_from_sheets(url):
         if not rut_col:
             df = pd.read_csv(url, dtype=str, skiprows=1)
         return _parse_exec_df(df)
+    except Exception:
+        return {}
+
+
+@st.cache_data(ttl=300)
+def load_emails_cobranza_from_sheets(url):
+    """Carga {rut: email_cobranza} desde columna AO de la base maestra."""
+    try:
+        df = pd.read_csv(url, dtype=str)
+        rut_col = next((c for c in df.columns if "rut" in c.lower()), None)
+        if not rut_col:
+            df = pd.read_csv(url, dtype=str, skiprows=1)
+        return _parse_email_cobranza_df(df)
     except Exception:
         return {}
 
@@ -404,6 +438,10 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
                 html  = generate_html(exec_data, fecha, sin_exec_rows=sin_exec_rows or None)
                 filename = f"CXC_Dashboard_{fecha.replace('/', '-')}.html"
 
+                # Cargar emails de cobranza desde base maestra
+                emails_cobranza = load_emails_cobranza_from_sheets(GOOGLE_SHEET_URL) if GOOGLE_SHEET_URL else {}
+                st.session_state["emails_cobranza"] = emails_cobranza
+
                 # Guardar en session_state para que persista al hacer clic en Enviar
                 st.session_state["exec_data"]     = exec_data
                 st.session_state["sin_exec_rows"] = sin_exec_rows
@@ -525,6 +563,95 @@ if "exec_data" in st.session_state:
                 st.success("✅ Correos enviados:\n" + "\n".join(f"- {s}" for s in sent))
             for err in errors:
                 st.error(err)
+
+# ── Envío de cobranza a clientes ─────────────────────────────────────────────
+if "exec_data" in st.session_state:
+    exec_data       = st.session_state["exec_data"]
+    fecha           = st.session_state["fecha"]
+    emails_cobranza = st.session_state.get("emails_cobranza", {})
+    email_cfg       = load_email_config()
+    smtp_cfg        = email_cfg.get("smtp", {})
+    smtp_ok         = bool(smtp_cfg.get("user") and smtp_cfg.get("password")
+                           and "xxxx" not in smtp_cfg.get("password", ""))
+
+    st.divider()
+    st.subheader("📬 Enviar Cobranza a Clientes")
+    st.markdown("Envía un aviso de deuda vencida directamente al contacto de pago de cada cliente.")
+
+    if not smtp_ok:
+        st.warning("Configura las credenciales SMTP para habilitar el envío.")
+    else:
+        # Recopilar todos los clientes con deuda vencida de todos los ejecutivos
+        all_clients = []
+        for e in exec_data:
+            for c in e["clientes"]:
+                if c["vencido"] > 0 and c.get("invoices"):
+                    all_clients.append({
+                        "ejecutivo": e["nombre"],
+                        "rut":       c["rut"],
+                        "cliente":   c["cliente"],
+                        "vencido":   c["vencido"],
+                        "invoices":  c["invoices"],
+                    })
+
+        if not all_clients:
+            st.info("No hay clientes con deuda vencida.")
+        else:
+            n_con_email = sum(1 for c in all_clients if emails_cobranza.get(c["rut"]))
+            n_sin_email = len(all_clients) - n_con_email
+            col1, col2 = st.columns(2)
+            col1.metric("Clientes con email registrado", n_con_email)
+            col2.metric("Sin email (requiere ingreso manual)", n_sin_email)
+
+            with st.expander(f"📋 Ver y editar destinatarios ({len(all_clients)} clientes con deuda)"):
+                st.markdown("Completa los correos que falten. Deja vacío para omitir el cliente.")
+                client_emails = {}
+                for c in all_clients:
+                    default = emails_cobranza.get(c["rut"], "")
+                    cols = st.columns([3, 2, 2])
+                    cols[0].markdown(f"**{c['cliente']}**  \n<small>{c['rut']} · {c['ejecutivo']}</small>",
+                                     unsafe_allow_html=True)
+                    cols[1].markdown(f"<div style='padding-top:8px;color:#c0392b;font-weight:700'>"
+                                     f"{fmt_clp(c['vencido'])}</div>", unsafe_allow_html=True)
+                    client_emails[c["rut"]] = cols[2].text_input(
+                        "Email contacto pago", value=default,
+                        key=f"cemail_{c['rut']}", label_visibility="collapsed",
+                        placeholder="email@cliente.cl"
+                    )
+
+            if st.button("📤 Enviar avisos de cobranza", type="primary"):
+                errors, sent = [], []
+                with st.spinner("Enviando avisos…"):
+                    for c in all_clients:
+                        to = client_emails.get(c["rut"], "").strip()
+                        if not to:
+                            continue
+                        try:
+                            body = generate_client_collection_email(
+                                cliente=c["cliente"],
+                                rut=c["rut"],
+                                ejecutivo=c["ejecutivo"],
+                                facturas=c["invoices"],
+                                total_vencido=c["vencido"],
+                                report_date=fecha,
+                            )
+                            send_email(
+                                email_cfg, [to],
+                                f"Aviso Saldo Pendiente — Cervecería Kross — {fecha}",
+                                body,
+                            )
+                            sent.append(f"{c['cliente']} → {to}")
+                        except Exception as ex:
+                            errors.append(f"{c['cliente']}: {ex}")
+
+                if sent:
+                    st.success(f"✅ Avisos enviados a {len(sent)} clientes:\n" +
+                               "\n".join(f"- {s}" for s in sent))
+                if errors:
+                    for err in errors:
+                        st.error(err)
+                if not sent and not errors:
+                    st.warning("Ningún cliente tenía email registrado. Completa los correos en la tabla.")
 
 st.divider()
 st.caption("Cervecería Kross · Dashboard CxC")

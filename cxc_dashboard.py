@@ -733,6 +733,123 @@ function toggleInv(uid) {{
 </body></html>"""
 
 
+def generate_client_collection_email(cliente, rut, ejecutivo, facturas, total_vencido, report_date):
+    """Genera email de cobranza para enviar directamente al cliente."""
+    inv_rows = ""
+    for inv in facturas:
+        monto_v = inv["d1_30"] + inv["d31_60"] + inv["d61_90"] + inv["d90plus"]
+        if monto_v <= 0:
+            continue
+        dias = int(inv.get("dias_atraso", inv.get("dias_mora", 0)))
+        if inv["d90plus"] > 0:    color_d, tramo = "#7b241c", "+90 días"
+        elif inv["d61_90"] > 0:   color_d, tramo = "#c0392b", "61–90 días"
+        elif inv["d31_60"] > 0:   color_d, tramo = "#e67e22", "31–60 días"
+        else:                      color_d, tramo = "#f39c12", "1–30 días"
+
+        inv_rows += f"""
+        <tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:13px">
+            Factura N° <strong>{inv['factura'] or '—'}</strong></td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:13px;color:#555">
+            {inv['emision'] or '—'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:13px;color:#555">
+            {inv['vencimiento'] or '—'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:13px;
+              color:{color_d};font-weight:700;text-align:center">
+            {dias} días<br><span style="font-size:10px;font-weight:400">({tramo})</span></td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:13px;
+              font-weight:700;text-align:right">{fmt_clp(monto_v)}</td>
+        </tr>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8">
+<title>Aviso de Saldo Pendiente — Cervecería Kross</title></head>
+<body style="margin:0;padding:0;background:#F7F5EF;font-family:'Segoe UI',Arial,sans-serif">
+<div style="max-width:640px;margin:0 auto;padding:24px">
+
+  <!-- Header Kross -->
+  <div style="background:#F5C200;padding:20px 28px;border-radius:10px 10px 0 0;
+              border-bottom:3px solid #d4a800">
+    <div style="font-size:22px;font-weight:900;color:#111;text-transform:uppercase;
+                letter-spacing:1px">🍺 Cervecería Kross</div>
+    <div style="font-size:12px;color:#444;margin-top:2px;font-weight:600">
+      Área de Cobranza · {report_date}</div>
+  </div>
+
+  <!-- Cuerpo -->
+  <div style="background:#fff;padding:28px;border-radius:0 0 10px 10px;
+              box-shadow:0 2px 12px rgba(0,0,0,.08)">
+
+    <p style="font-size:15px;color:#111;margin-bottom:8px">Estimado/a cliente,</p>
+    <p style="font-size:14px;color:#444;line-height:1.6;margin-bottom:20px">
+      Nos comunicamos para informarle que registra facturas con saldo pendiente de pago.
+      Le solicitamos gestionar la regularización a la brevedad posible.
+    </p>
+
+    <!-- Resumen deuda -->
+    <div style="background:#F7F5EF;border-left:4px solid #F5C200;padding:14px 18px;
+                border-radius:0 8px 8px 0;margin-bottom:24px">
+      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px">
+        Total saldo vencido</div>
+      <div style="font-size:28px;font-weight:900;color:#111;margin-top:2px">
+        {fmt_clp(total_vencido)}</div>
+      <div style="font-size:12px;color:#666;margin-top:4px">
+        Cliente: <strong>{cliente}</strong> &nbsp;·&nbsp; RUT: {rut}
+      </div>
+    </div>
+
+    <!-- Tabla facturas -->
+    <p style="font-size:13px;font-weight:700;color:#111;text-transform:uppercase;
+              letter-spacing:.5px;margin-bottom:10px">Detalle de facturas vencidas</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;border-radius:8px;
+                  overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+      <thead>
+        <tr style="background:#111;color:#F5C200">
+          <th style="padding:9px 12px;text-align:left;font-size:11px;
+                     text-transform:uppercase;letter-spacing:.3px">Documento</th>
+          <th style="padding:9px 12px;text-align:left;font-size:11px;
+                     text-transform:uppercase;letter-spacing:.3px">Emisión</th>
+          <th style="padding:9px 12px;text-align:left;font-size:11px;
+                     text-transform:uppercase;letter-spacing:.3px">Vencimiento</th>
+          <th style="padding:9px 12px;text-align:center;font-size:11px;
+                     text-transform:uppercase;letter-spacing:.3px">Días vencida</th>
+          <th style="padding:9px 12px;text-align:right;font-size:11px;
+                     text-transform:uppercase;letter-spacing:.3px">Monto</th>
+        </tr>
+      </thead>
+      <tbody>{inv_rows}</tbody>
+      <tfoot>
+        <tr style="background:#F7F5EF">
+          <td colspan="4" style="padding:10px 12px;font-weight:700;font-size:13px">
+            Total vencido</td>
+          <td style="padding:10px 12px;font-weight:900;font-size:15px;
+                     text-align:right;color:#111">{fmt_clp(total_vencido)}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- Instrucciones pago -->
+    <div style="margin-top:24px;padding:16px;background:#fffbea;border-radius:8px;
+                border:1px solid #F5C200">
+      <p style="font-size:13px;font-weight:700;color:#111;margin-bottom:6px">
+        💳 Información de pago</p>
+      <p style="font-size:13px;color:#555;margin:0;line-height:1.6">
+        Para coordinar el pago o consultar sobre esta deuda, por favor contáctese con
+        su ejecutivo de cuenta: <strong>{ejecutivo}</strong>.<br>
+        También puede escribir a <strong>cobranzas@kross.cl</strong>.
+      </p>
+    </div>
+
+    <p style="font-size:12px;color:#aaa;margin-top:24px;text-align:center">
+      Este es un aviso automático del sistema de cobranza de Cervecería Kross.<br>
+      Si ya realizó el pago, por favor ignore este mensaje.
+    </p>
+  </div>
+</div>
+</body></html>"""
+
+
 def semaforo_class(pct):
     if pct >= 30:
         return "card-red"
