@@ -364,10 +364,13 @@ if "exec_data" in st.session_state:
                             continue
                         try:
                             email_body = generate_email_body(e, fecha)
+                            ind_html   = generate_individual_html(e, fecha)
                             send_email(
                                 email_cfg, [to],
                                 f"Informe CxC — {e['nombre']} — {fecha}",
                                 email_body,
+                                ind_html,
+                                f"CxC_{e['nombre'].replace(' ','_')}_{fecha.replace('/','_')}.html",
                             )
                             sent.append(f"{e['nombre']} → {to}")
                         except Exception as ex:

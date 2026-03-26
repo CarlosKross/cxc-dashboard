@@ -495,17 +495,15 @@ def build_exec_kpis(summary, rows, name, fantasy_lookup=None):
         if r["d1_30"]   > 0:  return 15.0
         return 0.0
 
-    # Promedio simple entre todas las facturas vencidas (sin ponderar por monto)
+    # Días de calle: suma total sin ponderar (tramo más alto con saldo por factura, sumado)
     rows_vencidos = [r for r in rows if r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
-    dias_calle = (sum(_dias_calle_from_row(r) for r in rows_vencidos) / len(rows_vencidos)
-                  if rows_vencidos else 0.0)
+    dias_calle = sum(_dias_calle_from_row(r) for r in rows_vencidos)
 
-    # Días de calle por cliente: promedio simple de sus facturas vencidas
+    # Días de calle por cliente: suma de sus facturas vencidas
     for c in clients:
         c_rows = [r for r in rows if r["rut"] == c["rut"]
                   and r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
-        c["dias_calle"] = (sum(_dias_calle_from_row(r) for r in c_rows) / len(c_rows)
-                           if c_rows else 0.0)
+        c["dias_calle"] = sum(_dias_calle_from_row(r) for r in c_rows)
 
     return {
         "nombre": name,
