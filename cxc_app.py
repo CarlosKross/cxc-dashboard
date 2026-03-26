@@ -623,7 +623,8 @@ if "exec_data" in st.session_state:
                 errors, sent = [], []
                 with st.spinner("Enviando avisos…"):
                     for c in all_clients:
-                        to = client_emails.get(c["rut"], "").strip()
+                        # Leer directo desde session_state para garantizar el valor actual
+                        to = st.session_state.get(f"cemail_{c['rut']}", "").strip()
                         if not to:
                             continue
                         try:
