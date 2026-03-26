@@ -845,14 +845,38 @@ def generate_client_collection_email(cliente, rut, ejecutivo, facturas, total_ve
     </table>
 
     <!-- Instrucciones pago -->
-    <div style="margin-top:24px;padding:16px;background:#fffbea;border-radius:8px;
+    <div style="margin-top:24px;padding:18px 20px;background:#fffbea;border-radius:8px;
                 border:1px solid #F5C200">
-      <p style="font-size:13px;font-weight:700;color:#111;margin-bottom:6px">
-        💳 Información de pago</p>
-      <p style="font-size:13px;color:#555;margin:0;line-height:1.6">
-        Para coordinar el pago o consultar sobre esta deuda, por favor contáctese con
-        su ejecutivo de cuenta: <strong>{ejecutivo}</strong>.<br>
-        También puede escribir a <strong>cobranzas@kross.cl</strong>.
+      <p style="font-size:13px;font-weight:700;color:#111;margin:0 0 10px 0">
+        💳 Datos para el pago</p>
+      <table style="font-size:13px;color:#333;border-collapse:collapse;width:100%">
+        <tr>
+          <td style="padding:3px 12px 3px 0;color:#888;white-space:nowrap">Empresa</td>
+          <td style="padding:3px 0"><strong>CERVECERIA KROSS SA</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 12px 3px 0;color:#888;white-space:nowrap">RUT</td>
+          <td style="padding:3px 0"><strong>99.527.300-4</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 12px 3px 0;color:#888;white-space:nowrap">Banco</td>
+          <td style="padding:3px 0"><strong>Banco Security</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 12px 3px 0;color:#888;white-space:nowrap">Cuenta corriente</td>
+          <td style="padding:3px 0"><strong>086628801</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:3px 12px 3px 0;color:#888;white-space:nowrap">Email pago</td>
+          <td style="padding:3px 0"><a href="mailto:tesoreria@kross.cl"
+              style="color:#d4a800;font-weight:700">tesoreria@kross.cl</a></td>
+        </tr>
+      </table>
+      <p style="font-size:12px;color:#666;margin:12px 0 0 0;line-height:1.6">
+        Para coordinar el pago o consultas, contáctese con su ejecutivo de cuenta:
+        <strong>{ejecutivo}</strong>.<br>
+        También puede escribir a
+        <a href="mailto:csaez@kross.cl" style="color:#d4a800;font-weight:700">csaez@kross.cl</a>.
       </p>
     </div>
 
