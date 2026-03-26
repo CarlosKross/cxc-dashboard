@@ -18,6 +18,7 @@ from cxc_dashboard import (
     build_exec_kpis,
     generate_html,
     generate_individual_html,
+    generate_email_body,
     normalize_rut,
 )
 
@@ -49,7 +50,7 @@ def load_email_config():
 
 def send_email(cfg, to_list, subject, html_body, attachment_html=None, attachment_name=None):
     msg = MIMEMultipart("mixed")
-    msg["From"]    = cfg["smtp"]["user"]
+    msg["From"]    = f"Área de Cobranza Kross <{cfg['smtp']['user']}>"
     msg["To"]      = ", ".join(to_list)
     msg["Subject"] = subject
     msg.attach(MIMEText(html_body, "html", "utf-8"))
@@ -362,18 +363,11 @@ if "exec_data" in st.session_state:
                             errors.append(f"Sin email para {e['nombre']}")
                             continue
                         try:
-                            ind_html = generate_individual_html(e, fecha)
-                            body = (
-                                f"<p>Hola {e['nombre'].split()[0]},</p>"
-                                f"<p>Adjunto encontrarás tu informe de Cuentas por Cobrar al {fecha}.</p>"
-                                f"<p>Saludos,<br>Cervecería Kross</p>"
-                            )
+                            email_body = generate_email_body(e, fecha)
                             send_email(
                                 email_cfg, [to],
                                 f"Informe CxC — {e['nombre']} — {fecha}",
-                                body,
-                                ind_html,
-                                f"CxC_{e['nombre'].replace(' ','_')}_{fecha.replace('/','_')}.html",
+                                email_body,
                             )
                             sent.append(f"{e['nombre']} → {to}")
                         except Exception as ex:

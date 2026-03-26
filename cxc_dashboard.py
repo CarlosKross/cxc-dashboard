@@ -697,6 +697,141 @@ def semaforo_class(pct):
     return "card-green"
 
 
+def generate_email_body(e, report_date=""):
+    """HTML optimizado para enviar como cuerpo de correo: sin JS, facturas visibles, inline styles."""
+    pct   = e["pct_vencido"]
+    color = COLORS.get(e["nombre"], "#4F8EF7")
+    sc_color = "#e74c3c" if pct >= 30 else "#f39c12" if pct >= 15 else "#27ae60"
+
+    def kpi_card(label, value, border_color="#ddd", val_color="#1a2e4a"):
+        return (f'<td style="padding:12px 16px;background:#fff;border-radius:8px;'
+                f'border-top:4px solid {border_color};min-width:110px;text-align:center;'
+                f'box-shadow:0 2px 6px rgba(0,0,0,.07);vertical-align:top">'
+                f'<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px">{label}</div>'
+                f'<div style="font-size:18px;font-weight:700;color:{val_color};margin-top:4px">{value}</div></td>')
+
+    kpis_row = (
+        kpi_card("Total Cartera",   fmt_clp(e["total_cartera"]), color) +
+        kpi_card("No Vencido",      fmt_clp(e["no_vencido"]),    "#27ae60", "#27ae60") +
+        kpi_card("Vencido",         fmt_clp(e["vencido"]),       sc_color,  sc_color) +
+        kpi_card("% Vencido",       f"{pct:.1f}%",               sc_color,  sc_color) +
+        kpi_card("Días de Calle",   f"{e['dias_calle']:.0f} d.", color) +
+        kpi_card("Clientes Mora",   str(e["n_clientes_mora"]),   color)
+    )
+
+    tramos_row = (
+        kpi_card("1–30 días",   fmt_clp(e["d1_30"]),   "#f39c12", "#f39c12") +
+        kpi_card("31–60 días",  fmt_clp(e["d31_60"]),  "#e67e22", "#e67e22") +
+        kpi_card("61–90 días",  fmt_clp(e["d61_90"]),  "#c0392b", "#c0392b") +
+        kpi_card("&gt;90 días", fmt_clp(e["d90plus"]), "#7b241c", "#7b241c")
+    )
+
+    # Filas de clientes + facturas (todas visibles)
+    client_rows = ""
+    th = ('background:#1a2e4a;color:#fff;padding:8px 10px;text-align:left;'
+          'font-size:10px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap')
+    th_r = th + ';text-align:right'
+
+    for c in e["clientes"]:
+        if c["vencido"] <= 0:
+            continue
+        rb_color = "#c0392b" if c["pct_vencido"] >= 30 else "#d35400" if c["pct_vencido"] >= 15 else "#1e8449"
+        rb_bg    = "#fde8e8" if c["pct_vencido"] >= 30 else "#fef3cd" if c["pct_vencido"] >= 15 else "#e8f8ee"
+        rb_txt   = "ALTO"   if c["pct_vencido"] >= 30 else "MEDIO"   if c["pct_vencido"] >= 15 else "BAJO"
+        td = 'padding:7px 10px;border-bottom:1px solid #f0f2f5;vertical-align:middle;font-size:12px'
+        td_r = td + ';text-align:right;font-variant-numeric:tabular-nums'
+
+        client_rows += (
+            f'<tr style="background:#f7f9fc">'
+            f'<td style="{td};font-weight:700;color:#1a2e4a" colspan="2">{c["cliente"]}</td>'
+            f'<td style="{td};font-size:10px;color:#888">{c["rut"]}</td>'
+            f'<td style="{td_r}">{fmt_clp(c["no_vencido"])}</td>'
+            f'<td style="{td_r};font-weight:700">{fmt_clp(c["total"])}</td>'
+            f'<td style="{td_r};color:#f39c12">{fmt_clp(c["d1_30"])}</td>'
+            f'<td style="{td_r};color:#e67e22">{fmt_clp(c["d31_60"])}</td>'
+            f'<td style="{td_r};color:#c0392b">{fmt_clp(c["d61_90"])}</td>'
+            f'<td style="{td_r};color:#7b241c">{fmt_clp(c["d90plus"])}</td>'
+            f'<td style="{td_r};font-weight:700">{fmt_clp(c["vencido"])}</td>'
+            f'<td style="{td_r}">{c["dias_calle"]:.0f} d.</td>'
+            f'<td style="{td};text-align:center"><span style="background:{rb_bg};color:{rb_color};'
+            f'padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">{rb_txt}</span></td>'
+            f'</tr>'
+        )
+        for inv in c.get("invoices", []):
+            monto_v = inv["d1_30"] + inv["d31_60"] + inv["d61_90"] + inv["d90plus"]
+            if monto_v <= 0:
+                continue
+            if inv["d90plus"] > 0:    tramo_c, tramo_t = "#7b241c", "&gt;90 d."
+            elif inv["d61_90"] > 0:   tramo_c, tramo_t = "#c0392b", "61–90 d."
+            elif inv["d31_60"] > 0:   tramo_c, tramo_t = "#e67e22", "31–60 d."
+            else:                      tramo_c, tramo_t = "#f39c12", "1–30 d."
+            client_rows += (
+                f'<tr style="background:#fff">'
+                f'<td style="{td};padding-left:24px;color:#888;font-size:11px">📄</td>'
+                f'<td style="{td};font-size:11px;color:#555">Fact. {inv["factura"] or "—"}</td>'
+                f'<td style="{td};font-size:11px;color:#888">{inv["emision"] or "—"}</td>'
+                f'<td style="{td};font-size:11px;color:#888" colspan="2">{inv["vencimiento"] or "—"}</td>'
+                f'<td colspan="4" style="{td};text-align:center;font-size:11px;color:{tramo_c};font-weight:700">{tramo_t}</td>'
+                f'<td style="{td_r};font-size:11px;font-weight:700">{fmt_clp(monto_v)}</td>'
+                f'<td colspan="2"></td>'
+                f'</tr>'
+            )
+
+    if not client_rows:
+        client_rows = f'<tr><td colspan="12" style="text-align:center;padding:20px;color:#888">Sin clientes con deuda vencida</td></tr>'
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Informe CxC — {e['nombre']}</title></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:'Segoe UI',Arial,sans-serif">
+<div style="max-width:900px;margin:0 auto;padding:20px">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#1a2e4a,#2d5a8e);color:#fff;padding:24px 32px;border-radius:10px 10px 0 0">
+    <div style="font-size:20px;font-weight:700">Informe Cuentas por Cobrar — {e['nombre']}</div>
+    <div style="font-size:12px;color:#b0c4de;margin-top:4px">Fecha: {report_date} &nbsp;|&nbsp; Uso interno — confidencial</div>
+  </div>
+
+  <!-- KPIs -->
+  <div style="background:#f0f2f5;padding:16px 0">
+    <table style="border-collapse:separate;border-spacing:10px;width:100%"><tr>{kpis_row}</tr></table>
+    <table style="border-collapse:separate;border-spacing:10px;width:100%"><tr>{tramos_row}</tr></table>
+  </div>
+
+  <!-- Barra progreso -->
+  <div style="background:#fff;padding:12px 20px;border-radius:6px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+    <div style="flex:1;height:10px;background:#e8edf3;border-radius:5px;overflow:hidden">
+      <div style="height:100%;width:{min(pct,100):.1f}%;background:{sc_color};border-radius:5px"></div>
+    </div>
+    <span style="font-size:12px;color:#555;min-width:130px">{pct:.1f}% cartera vencida</span>
+  </div>
+
+  <!-- Tabla clientes -->
+  <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);font-size:12px">
+    <thead><tr>
+      <th style="{th}" colspan="2">Cliente</th>
+      <th style="{th}">RUT</th>
+      <th style="{th_r}">No Vencido</th>
+      <th style="{th_r}">Total</th>
+      <th style="{th_r}">1–30 d.</th>
+      <th style="{th_r}">31–60 d.</th>
+      <th style="{th_r}">61–90 d.</th>
+      <th style="{th_r}">&gt;90 d.</th>
+      <th style="{th_r}">Vencido</th>
+      <th style="{th_r}">Días C.</th>
+      <th style="{th}">Riesgo</th>
+    </tr></thead>
+    <tbody>{client_rows}</tbody>
+  </table>
+
+  <div style="text-align:center;padding:20px;color:#aaa;font-size:11px">
+    Informe CxC {report_date} · Cervecería Kross · Confidencial
+  </div>
+</div>
+</body></html>"""
+
+
 def generate_html(exec_data, report_date="18/03/2026", sin_exec_rows=None):
     total_global = sum(e["total_cartera"] for e in exec_data)
     vencido_global = sum(e["vencido"] for e in exec_data)
