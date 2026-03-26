@@ -363,6 +363,24 @@ def parse_analisis_deuda(xls, exec_lookup=None, fantasy_lookup=None):
     exec_lookup    = exec_lookup or {}
     fantasy_lookup = fantasy_lookup or {}
 
+    # Extraer fecha del informe desde el archivo (fila con "Fecha Informe:")
+    fecha_informe = pd.Timestamp.today().normalize()
+    for i in range(min(header_row, 10)):
+        for v in df_raw.iloc[i].values:
+            s = str(v).strip()
+            if "fecha informe" in s.lower():
+                # buscar la celda siguiente con fecha
+                row_vals = [str(x).strip() for x in df_raw.iloc[i].values]
+                for rv in row_vals:
+                    try:
+                        ts = pd.to_datetime(rv, dayfirst=True, errors="coerce")
+                        if not pd.isna(ts):
+                            fecha_informe = ts.normalize()
+                            break
+                    except Exception:
+                        pass
+                break
+
     def safe_float(v):
         try:   return float(v) if not pd.isna(v) else 0.0
         except: return 0.0
@@ -373,6 +391,19 @@ def parse_analisis_deuda(xls, exec_lookup=None, fantasy_lookup=None):
             ts = pd.to_datetime(v, errors="coerce", dayfirst=True)
             return ts.strftime("%d/%m/%Y") if not pd.isna(ts) else str(v).split(" ")[0]
         except: return str(v).split(" ")[0]
+
+    def calc_dias_mora(vencim_val):
+        """Días transcurridos desde el vencimiento hasta la fecha del informe."""
+        if vencim_val is None or pd.isna(vencim_val):
+            return 0.0
+        try:
+            ts = pd.to_datetime(vencim_val, errors="coerce", dayfirst=True)
+            if pd.isna(ts):
+                return 0.0
+            delta = (fecha_informe - ts.normalize()).days
+            return max(0.0, float(delta))
+        except Exception:
+            return 0.0
 
     # Agrupar filas por ejecutivo
     data = df_raw.iloc[header_row + 1:].copy()
@@ -404,10 +435,13 @@ def parse_analisis_deuda(xls, exec_lookup=None, fantasy_lookup=None):
         if _en in SIN_EJECUTIVO_ALIASES:
             exec_name = "Sin Ejecutivo"
 
+        vencim_raw = row[vencim_idx] if vencim_idx is not None else None
+        dias_mora  = calc_dias_mora(vencim_raw)
+
         r = {
             "rut": rut, "cliente": cliente,
             "factura": "", "emision": "", "vencimiento": "",
-            "dias_mora":  0.0,
+            "dias_mora":  dias_mora,
             "no_vencido": safe_float(row[col_map["NO VENCIDO"]]),
             "d1_30":      safe_float(row[col_map["1-30 DIAS"]]),
             "d31_60":     safe_float(row[col_map["31-60 DIAS"]]),
@@ -495,15 +529,19 @@ def build_exec_kpis(summary, rows, name, fantasy_lookup=None):
         if r["d1_30"]   > 0:  return 15.0
         return 0.0
 
-    # Días de calle: suma total sin ponderar (tramo más alto con saldo por factura, sumado)
+    # Días de calle: promedio simple de días exactos desde vencimiento por factura vencida
+    # Si dias_mora está disponible (calculado desde fecha vencimiento), se usa directamente.
+    # Si no, se estima con el tramo más alto con saldo.
     rows_vencidos = [r for r in rows if r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
-    dias_calle = sum(_dias_calle_from_row(r) for r in rows_vencidos)
+    dias_calle = (sum(_dias_calle_from_row(r) for r in rows_vencidos) / len(rows_vencidos)
+                  if rows_vencidos else 0.0)
 
-    # Días de calle por cliente: suma de sus facturas vencidas
+    # Días de calle por cliente: promedio simple de sus facturas vencidas
     for c in clients:
         c_rows = [r for r in rows if r["rut"] == c["rut"]
                   and r["d1_30"]+r["d31_60"]+r["d61_90"]+r["d90plus"] > 0]
-        c["dias_calle"] = sum(_dias_calle_from_row(r) for r in c_rows)
+        c["dias_calle"] = (sum(_dias_calle_from_row(r) for r in c_rows) / len(c_rows)
+                           if c_rows else 0.0)
 
     return {
         "nombre": name,
