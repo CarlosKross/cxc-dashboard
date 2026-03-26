@@ -733,23 +733,14 @@ function toggleInv(uid) {{
 </body></html>"""
 
 
-def _load_logo_b64():
-    """Carga el logo Kross en base64 desde archivo local."""
-    import base64
-    logo_path = Path(__file__).parent / "kross_logo.png.png"
-    if not logo_path.exists():
-        logo_path = Path(__file__).parent / "kross_logo.png"
-    if logo_path.exists():
-        return base64.b64encode(logo_path.read_bytes()).decode()
-    return None
+KROSS_LOGO_URL = "https://raw.githubusercontent.com/CarlosKross/cxc-dashboard/main/kross_logo.png.png"
 
 
 def generate_client_collection_email(cliente, rut, ejecutivo, facturas, total_vencido, report_date):
     """Genera email de cobranza para enviar directamente al cliente."""
-    logo_b64 = _load_logo_b64()
-    logo_html = (f'<img src="data:image/png;base64,{logo_b64}" '
-                 f'width="64" height="64" style="border-radius:50%;flex-shrink:0" '
-                 f'alt="Kross"/>')  if logo_b64 else ""
+    logo_html = (f'<img src="{KROSS_LOGO_URL}" '
+                 f'width="70" height="70" style="border-radius:50%;flex-shrink:0" '
+                 f'alt="Cervecería Kross"/>')
     inv_rows = ""
     for inv in facturas:
         monto_v = inv["d1_30"] + inv["d31_60"] + inv["d61_90"] + inv["d90plus"]
