@@ -22,6 +22,15 @@ COLORS = {
     "Gerson Astudillo":   "#F7C94F",
 }
 
+# Valores en columna Ejecutivo que NO son ejecutivos reales → van a "Sin Ejecutivo"
+SIN_EJECUTIVO_ALIASES = {
+    "ex cliente", "ex-cliente", "ex_cliente",
+    "clausurado", "clausurada",
+    "sin patente", "sin ejecutivo", "sin asignar", "sin asignacion",
+    "inactivo", "inactiva", "dado de baja", "baja", "cerrado", "cerrada",
+    "no asignado", "no asignada", "pendiente", "varios",
+}
+
 def normalize_rut(rut_str):
     """Normalize RUT: remove dots, strip leading zeros, uppercase K."""
     cleaned = str(rut_str).strip().replace(".", "").upper()
@@ -387,6 +396,13 @@ def parse_analisis_deuda(xls, exec_lookup=None, fantasy_lookup=None):
             cliente = fantasy_lookup[rut]
 
         exec_name = exec_lookup.get(rut, "Sin Ejecutivo")
+
+        # Remap pseudo-ejecutivos a "Sin Ejecutivo"
+        import unicodedata as _ud
+        _en = _ud.normalize("NFD", exec_name.strip().lower())
+        _en = "".join(c for c in _en if _ud.category(c) != "Mn")
+        if _en in SIN_EJECUTIVO_ALIASES:
+            exec_name = "Sin Ejecutivo"
 
         r = {
             "rut": rut, "cliente": cliente,

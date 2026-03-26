@@ -320,8 +320,9 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
 
                 if not smtp_ok:
                     st.warning(
-                        "Configura el correo remitente en `email_config.json` "
-                        "(usuario y contraseña de aplicación de Gmail) para habilitar el envío."
+                        "**El envío de correos no está configurado.**  \n"
+                        "Para habilitarlo, ve a tu app en **share.streamlit.io → Settings → Secrets** "
+                        "y agrega las credenciales SMTP. Contacta al administrador del sistema."
                     )
                 else:
                     col_a, col_b = st.columns(2)
