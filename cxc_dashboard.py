@@ -967,7 +967,10 @@ def generate_client_statement_email(cliente, rut, ejecutivo, all_invoices, repor
 
     <p style="font-size:15px;color:#111;margin-bottom:6px">Estimado/a cliente,</p>
     <p style="font-size:13px;color:#555;line-height:1.6;margin-bottom:22px">
-      A continuación encontrará el detalle de su estado de cuenta al <strong>{report_date}</strong>.
+      Como parte de nuestro compromiso con la transparencia, le enviamos su
+      <strong>estado de cuenta semanal</strong> al <strong>{report_date}</strong>.<br>
+      Aquí encontrará el detalle de todos sus documentos vigentes y vencidos con Cervecería Kross.
+      Si tiene alguna consulta, no dude en contactarse con su ejecutivo de cuenta.
     </p>
 
     <!-- Resumen -->

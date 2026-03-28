@@ -733,7 +733,7 @@ if "exec_data" in st.session_state:
                         )
                         send_email(
                             email_cfg, [to],
-                            f"Estado de Cuenta — Cervecería Kross — {fecha}",
+                            f"Tu Estado de Cuenta Semanal — Cervecería Kross — {fecha}",
                             body,
                         )
                         sent.append(f"{c['cliente']} → {to}")
