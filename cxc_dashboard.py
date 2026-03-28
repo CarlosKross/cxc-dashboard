@@ -490,9 +490,12 @@ def aggregate_by_client(rows):
         clients[key]["d61_90"]     += r["d61_90"]
         clients[key]["d90plus"]    += r["d90plus"]
         clients[key]["total"]      += r["total"]
-        # Only store invoices that have some overdue amount
+        # Overdue invoices for collection detail
         if r["d1_30"] + r["d31_60"] + r["d61_90"] + r["d90plus"] > 0:
             clients[key]["invoices"].append(r)
+        # All invoices (including vigentes) for estado de cuenta
+        if r.get("total", 0) > 0 or r.get("no_vencido", 0) > 0:
+            clients[key].setdefault("all_invoices", []).append(r)
 
     result = list(clients.values())
     for c in result:
@@ -883,6 +886,151 @@ def generate_client_collection_email(cliente, rut, ejecutivo, facturas, total_ve
     <p style="font-size:12px;color:#aaa;margin-top:24px;text-align:center">
       Este es un aviso automático del sistema de cobranza de Cervecería Kross.<br>
       Si ya realizó el pago, por favor ignore este mensaje.
+    </p>
+  </div>
+</div>
+</body></html>"""
+
+
+def generate_client_statement_email(cliente, rut, ejecutivo, all_invoices, report_date):
+    """Estado de cuenta completo: facturas vigentes + vencidas."""
+    from datetime import date
+    today = date.today()
+
+    inv_rows = ""
+    total_vigente = 0
+    total_vencido = 0
+    total_general = 0
+
+    # Ordenar: primero vencidas (por días desc), luego vigentes
+    def sort_key(inv):
+        dias = inv.get("dias_mora", 0)
+        venc = inv["d1_30"] + inv["d31_60"] + inv["d61_90"] + inv["d90plus"]
+        return (0 if venc > 0 else 1, -dias)
+
+    for inv in sorted(all_invoices, key=sort_key):
+        monto_v = inv["d1_30"] + inv["d31_60"] + inv["d61_90"] + inv["d90plus"]
+        monto_nv = inv.get("no_vencido", 0)
+        monto = monto_v if monto_v > 0 else monto_nv
+        if monto <= 0:
+            continue
+
+        dias = int(inv.get("dias_mora", 0))
+
+        if monto_v > 0:
+            total_vencido += monto_v
+            if inv["d90plus"] > 0:    bg, color, estado = "#fff5f5", "#7b241c", f"+90 días vencida"
+            elif inv["d61_90"] > 0:   bg, color, estado = "#fff5f5", "#c0392b", f"61–90 días vencida"
+            elif inv["d31_60"] > 0:   bg, color, estado = "#fff8f0", "#e67e22", f"31–60 días vencida"
+            else:                      bg, color, estado = "#fffdf0", "#d4a800", f"1–30 días vencida"
+            dias_cell = f'<td style="padding:8px 12px;border-bottom:1px solid #f0ece0;text-align:center;font-weight:700;color:{color}">{dias}d</td>'
+        else:
+            total_vigente += monto_nv
+            bg, color, estado = "#f0fff4", "#1e8449", "Al día"
+            dias_cell = f'<td style="padding:8px 12px;border-bottom:1px solid #f0ece0;text-align:center;font-weight:700;color:{color}">—</td>'
+
+        total_general += monto
+        inv_rows += f"""<tr style="background:{bg}">
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:12px">N° <strong>{inv.get('factura') or '—'}</strong></td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:12px;color:#555">{inv.get('emision') or '—'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:12px;color:#555">{inv.get('vencimiento') or '—'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:12px;font-weight:600;color:{color};text-align:center">{estado}</td>
+          {dias_cell}
+          <td style="padding:8px 12px;border-bottom:1px solid #f0ece0;font-size:12px;text-align:right;font-weight:700">{fmt_clp(monto)}</td>
+        </tr>"""
+
+    resumen_vencido = f"""<span style="color:#c0392b;font-weight:900">{fmt_clp(total_vencido)}</span>
+        <span style="font-size:11px;color:#888"> vencido</span>""" if total_vencido > 0 else ""
+
+    logo_html = (f'<img src="{KROSS_LOGO_URL}" width="72" height="72" style="display:block" alt="Kross"/>')
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Estado de Cuenta — {cliente}</title></head>
+<body style="margin:0;padding:0;background:#F7F5EF;font-family:'Segoe UI',Arial,sans-serif">
+<div style="max-width:660px;margin:0 auto;padding:24px">
+
+  <table width="100%" cellpadding="0" cellspacing="0"
+         style="background:#111;border-radius:10px 10px 0 0;border-bottom:3px solid #F5C200">
+    <tr>
+      <td style="padding:20px 24px;vertical-align:middle">
+        <div style="font-size:20px;font-weight:900;color:#F5C200;text-transform:uppercase;letter-spacing:1px">
+          Cervecería Kross</div>
+        <div style="font-size:11px;color:#aaa;margin-top:3px;text-transform:uppercase;letter-spacing:.5px">
+          Estado de Cuenta · {report_date}</div>
+      </td>
+      <td style="padding:12px 20px;text-align:right;vertical-align:middle;width:90px">{logo_html}</td>
+    </tr>
+  </table>
+
+  <div style="background:#fff;padding:28px;border-radius:0 0 10px 10px;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+
+    <p style="font-size:15px;color:#111;margin-bottom:6px">Estimado/a cliente,</p>
+    <p style="font-size:13px;color:#555;line-height:1.6;margin-bottom:22px">
+      A continuación encontrará el detalle de su estado de cuenta al <strong>{report_date}</strong>.
+    </p>
+
+    <!-- Resumen -->
+    <table width="100%" cellpadding="0" cellspacing="0"
+           style="background:#F7F5EF;border-radius:8px;border-left:4px solid #F5C200;margin-bottom:24px">
+      <tr>
+        <td style="padding:16px 20px">
+          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px">Cliente</div>
+          <div style="font-size:16px;font-weight:900;color:#111;margin-top:2px">{cliente}</div>
+          <div style="font-size:12px;color:#666;margin-top:2px">RUT: {rut}</div>
+        </td>
+        <td style="padding:16px 20px;text-align:right;vertical-align:middle">
+          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px">Total cuenta</div>
+          <div style="font-size:22px;font-weight:900;color:#111;margin-top:2px">{fmt_clp(total_general)}</div>
+          <div style="font-size:12px;margin-top:4px">{resumen_vencido}</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Tabla facturas -->
+    <p style="font-size:12px;font-weight:700;color:#111;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+      Detalle de documentos</p>
+    <table width="100%" cellpadding="0" cellspacing="0"
+           style="border-collapse:collapse;border-radius:8px;overflow:hidden;
+                  box-shadow:0 1px 4px rgba(0,0,0,.08)">
+      <thead>
+        <tr style="background:#111;color:#F5C200">
+          <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.3px">Documento</th>
+          <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.3px">Emisión</th>
+          <th style="padding:9px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.3px">Vencimiento</th>
+          <th style="padding:9px 12px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.3px">Estado</th>
+          <th style="padding:9px 12px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.3px">Días</th>
+          <th style="padding:9px 12px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.3px">Monto</th>
+        </tr>
+      </thead>
+      <tbody>{inv_rows}</tbody>
+      <tfoot>
+        <tr style="background:#F7F5EF">
+          <td colspan="5" style="padding:10px 12px;font-weight:700;font-size:13px">Total</td>
+          <td style="padding:10px 12px;font-weight:900;font-size:15px;text-align:right">{fmt_clp(total_general)}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- Datos pago -->
+    <div style="margin-top:24px;padding:16px 20px;background:#fffbea;border-radius:8px;border:1px solid #F5C200">
+      <p style="font-size:12px;font-weight:700;color:#111;margin:0 0 8px 0">💳 Datos para el pago</p>
+      <table style="font-size:12px;color:#333;border-collapse:collapse">
+        <tr><td style="padding:2px 16px 2px 0;color:#888">Empresa</td><td><strong>CERVECERIA KROSS SA</strong></td></tr>
+        <tr><td style="padding:2px 16px 2px 0;color:#888">RUT</td><td><strong>99.527.300-4</strong></td></tr>
+        <tr><td style="padding:2px 16px 2px 0;color:#888">Banco</td><td><strong>Banco Security</strong></td></tr>
+        <tr><td style="padding:2px 16px 2px 0;color:#888">Cta. Corriente</td><td><strong>086628801</strong></td></tr>
+        <tr><td style="padding:2px 16px 2px 0;color:#888">Email pago</td>
+            <td><a href="mailto:tesoreria@kross.cl" style="color:#d4a800;font-weight:700">tesoreria@kross.cl</a></td></tr>
+      </table>
+      <p style="font-size:11px;color:#666;margin:10px 0 0 0;line-height:1.5">
+        Consultas con su ejecutivo: <strong>{ejecutivo}</strong> ·
+        <a href="mailto:csaez@kross.cl" style="color:#d4a800;font-weight:700">csaez@kross.cl</a>
+      </p>
+    </div>
+
+    <p style="font-size:11px;color:#bbb;margin-top:20px;text-align:center">
+      Estado de cuenta generado automáticamente · Cervecería Kross · {report_date}
     </p>
   </div>
 </div>

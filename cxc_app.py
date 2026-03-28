@@ -20,6 +20,7 @@ from cxc_dashboard import (
     generate_individual_html,
     generate_email_body,
     generate_client_collection_email,
+    generate_client_statement_email,
     normalize_rut,
     fmt_clp,
 )
@@ -653,6 +654,100 @@ if "exec_data" in st.session_state:
                         st.error(err)
                 if not sent and not errors:
                     st.warning("Ningún cliente tenía email registrado. Completa los correos en la tabla.")
+
+# ── Estado de Cuenta completo (todos los clientes) ───────────────────────────
+if "exec_data" in st.session_state:
+    exec_data       = st.session_state["exec_data"]
+    fecha           = st.session_state["fecha"]
+    emails_cobranza = st.session_state.get("emails_cobranza", {})
+    email_cfg       = load_email_config()
+    smtp_cfg        = email_cfg.get("smtp", {})
+    smtp_ok         = bool(smtp_cfg.get("user") and smtp_cfg.get("password")
+                           and "xxxx" not in smtp_cfg.get("password", ""))
+
+    st.divider()
+    st.subheader("📋 Enviar Estado de Cuenta a Clientes")
+    st.markdown(
+        "Envía el estado de cuenta completo (facturas vigentes **y** vencidas) "
+        "a todos los clientes. Recomendado enviar cada **lunes** al subir el archivo."
+    )
+
+    import datetime as _dt
+    hoy = _dt.date.today()
+    if hoy.weekday() == 0:
+        st.success("✅ Hoy es lunes — momento ideal para enviar el estado de cuenta semanal.")
+
+    if not smtp_ok:
+        st.warning("Configura las credenciales SMTP para habilitar el envío.")
+    else:
+        # Recopilar todos los clientes con cualquier saldo
+        all_clients_stmt = []
+        for e in exec_data:
+            for c in e["clientes"]:
+                all_invoices = c.get("all_invoices") or c.get("invoices", [])
+                if all_invoices:
+                    all_clients_stmt.append({
+                        "ejecutivo":    e["nombre"],
+                        "rut":          c["rut"],
+                        "cliente":      c["cliente"],
+                        "total":        c["total"],
+                        "vencido":      c["vencido"],
+                        "all_invoices": all_invoices,
+                    })
+
+        n_con = sum(1 for c in all_clients_stmt if emails_cobranza.get(c["rut"]))
+        n_sin = len(all_clients_stmt) - n_con
+        col1, col2 = st.columns(2)
+        col1.metric("Clientes con email registrado", n_con)
+        col2.metric("Sin email", n_sin)
+
+        with st.expander(f"📋 Ver destinatarios ({len(all_clients_stmt)} clientes)"):
+            stmt_emails = {}
+            for c in all_clients_stmt:
+                default = emails_cobranza.get(c["rut"], "")
+                cols = st.columns([3, 2, 2])
+                estado_txt = f"🔴 {fmt_clp(c['vencido'])} vencido" if c["vencido"] > 0 else "🟢 Al día"
+                cols[0].markdown(f"**{c['cliente']}**  \n<small>{c['rut']} · {c['ejecutivo']}</small>",
+                                 unsafe_allow_html=True)
+                cols[1].markdown(f"<div style='padding-top:8px;font-size:13px'>{estado_txt}</div>",
+                                 unsafe_allow_html=True)
+                stmt_emails[c["rut"]] = cols[2].text_input(
+                    "Email", value=default, key=f"semail_{c['rut']}",
+                    label_visibility="collapsed", placeholder="email@cliente.cl"
+                )
+
+        if st.button("📤 Enviar estado de cuenta a todos", type="primary"):
+            errors, sent = [], []
+            with st.spinner("Enviando estados de cuenta…"):
+                for c in all_clients_stmt:
+                    to = stmt_emails.get(c["rut"], "").strip()
+                    if not to:
+                        continue
+                    try:
+                        body = generate_client_statement_email(
+                            cliente=c["cliente"],
+                            rut=c["rut"],
+                            ejecutivo=c["ejecutivo"],
+                            all_invoices=c["all_invoices"],
+                            report_date=fecha,
+                        )
+                        send_email(
+                            email_cfg, [to],
+                            f"Estado de Cuenta — Cervecería Kross — {fecha}",
+                            body,
+                        )
+                        sent.append(f"{c['cliente']} → {to}")
+                    except Exception as ex:
+                        errors.append(f"{c['cliente']}: {ex}")
+
+            if sent:
+                st.success(f"✅ Estados de cuenta enviados a {len(sent)} clientes:\n" +
+                           "\n".join(f"- {s}" for s in sent))
+            if errors:
+                for err in errors:
+                    st.error(err)
+            if not sent and not errors:
+                st.warning("Ningún cliente tenía email registrado.")
 
 st.divider()
 st.caption("Cervecería Kross · Dashboard CxC")
