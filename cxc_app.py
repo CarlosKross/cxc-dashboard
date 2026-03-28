@@ -338,6 +338,11 @@ cxc_file = st.file_uploader(
     help="Informe CxC con hojas por ejecutivo",
 )
 
+# Guardar bytes en session_state para que persistan al clic del botón
+if cxc_file is not None:
+    st.session_state["cxc_bytes"] = cxc_file.read()
+    st.session_state["cxc_name"]  = cxc_file.name
+
 report_date = st.text_input("Fecha del informe", value="", placeholder="dd/mm/aaaa", max_chars=12)
 
 # ── Base maestra (optional override) ─────────────────────────────────────────
@@ -354,7 +359,8 @@ with st.expander("⚙️ Opciones avanzadas — Base Maestra"):
     )
 
 # ── Generate ──────────────────────────────────────────────────────────────────
-if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None):
+if st.button("🚀 Generar Dashboard", type="primary",
+             disabled="cxc_bytes" not in st.session_state):
 
     with st.spinner("Procesando…"):
 
@@ -375,9 +381,11 @@ if st.button("🚀 Generar Dashboard", type="primary", disabled=cxc_file is None
         else:
             fantasy_lookup = {}
 
-        ext = ".xls" if cxc_file.name.lower().endswith(".xls") else ".xlsx"
+        cxc_bytes = st.session_state["cxc_bytes"]
+        cxc_name  = st.session_state["cxc_name"]
+        ext = ".xls" if cxc_name.lower().endswith(".xls") else ".xlsx"
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-            tmp.write(cxc_file.read())
+            tmp.write(cxc_bytes)
             cxc_tmp = tmp.name
 
         try:
