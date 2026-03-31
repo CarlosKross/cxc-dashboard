@@ -42,6 +42,7 @@ def load_email_config():
                 },
                 "ejecutivos": dict(s.get("ejecutivos", {})),
                 "jefaturas":  list(s.get("jefaturas", {}).get("lista", [])),
+                "gestor":     s.get("gestor", ""),
             }
             return cfg
     except Exception:
