@@ -51,10 +51,12 @@ def load_email_config():
         return json.loads(EMAIL_CONFIG_PATH.read_text(encoding="utf-8"))
     return {}
 
-def send_email(cfg, to_list, subject, html_body, attachment_html=None, attachment_name=None):
+def send_email(cfg, to_list, subject, html_body, attachment_html=None, attachment_name=None, cc_list=None):
     msg = MIMEMultipart("mixed")
     msg["From"]    = f"Área de Cobranza Kross <{cfg['smtp']['user']}>"
     msg["To"]      = ", ".join(to_list)
+    if cc_list:
+        msg["Cc"]  = ", ".join(cc_list)
     msg["Subject"] = subject
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
@@ -65,11 +67,12 @@ def send_email(cfg, to_list, subject, html_body, attachment_html=None, attachmen
         part.add_header("Content-Disposition", f'attachment; filename="{attachment_name}"')
         msg.attach(part)
 
+    all_recipients = to_list + (cc_list or [])
     context = ssl.create_default_context()
     with smtplib.SMTP(cfg["smtp"]["host"], cfg["smtp"]["port"]) as server:
         server.starttls(context=context)
         server.login(cfg["smtp"]["user"], cfg["smtp"]["password"])
-        server.sendmail(cfg["smtp"]["user"], to_list, msg.as_string())
+        server.sendmail(cfg["smtp"]["user"], all_recipients, msg.as_string())
 
 # Sheets that are NOT executive detail sheets
 NON_EXEC_SHEETS = {"resumen ejecutivo", "resumen vencido", "resumen", "parametros", "parámetros"}
@@ -645,10 +648,15 @@ if "exec_data" in st.session_state:
                                 total_vencido=c["vencido"],
                                 report_date=fecha,
                             )
+                            # CC: ejecutivo a cargo + gestor (remitente)
+                            exec_email = exec_emails.get(c["ejecutivo"], "")
+                            gestor_email = cfg_smtp_user = email_cfg.get("smtp", {}).get("user", "")
+                            cc = [e for e in [exec_email, gestor_email] if e and e != to]
                             send_email(
                                 email_cfg, [to],
                                 f"Aviso Saldo Pendiente — Cervecería Kross — {fecha}",
                                 body,
+                                cc_list=cc or None,
                             )
                             sent.append(f"{c['cliente']} → {to}")
                         except Exception as ex:
@@ -750,10 +758,15 @@ if "exec_data" in st.session_state:
                             all_invoices=c["all_invoices"],
                             report_date=fecha,
                         )
+                        # CC: ejecutivo a cargo + gestor
+                        exec_email_cc = exec_emails.get(c["ejecutivo"], "")
+                        gestor_cc     = email_cfg.get("smtp", {}).get("user", "")
+                        cc = [e for e in [exec_email_cc, gestor_cc] if e and e != to]
                         send_email(
                             email_cfg, [to],
                             f"Tu Estado de Cuenta Semanal — Cervecería Kross — {fecha}",
                             body,
+                            cc_list=cc or None,
                         )
                         sent.append(f"{c['cliente']} → {to}")
                     except Exception as ex:
