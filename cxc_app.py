@@ -648,9 +648,9 @@ if "exec_data" in st.session_state:
                                 total_vencido=c["vencido"],
                                 report_date=fecha,
                             )
-                            # CC: ejecutivo a cargo + gestor (remitente)
-                            exec_email = exec_emails.get(c["ejecutivo"], "")
-                            gestor_email = cfg_smtp_user = email_cfg.get("smtp", {}).get("user", "")
+                            # CC: ejecutivo a cargo + gestor
+                            exec_email   = exec_emails.get(c["ejecutivo"], "")
+                            gestor_email = email_cfg.get("gestor", "")
                             cc = [e for e in [exec_email, gestor_email] if e and e != to]
                             send_email(
                                 email_cfg, [to],
@@ -760,7 +760,7 @@ if "exec_data" in st.session_state:
                         )
                         # CC: ejecutivo a cargo + gestor
                         exec_email_cc = exec_emails.get(c["ejecutivo"], "")
-                        gestor_cc     = email_cfg.get("smtp", {}).get("user", "")
+                        gestor_cc     = email_cfg.get("gestor", "")
                         cc = [e for e in [exec_email_cc, gestor_cc] if e and e != to]
                         send_email(
                             email_cfg, [to],
