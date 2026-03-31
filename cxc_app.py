@@ -676,8 +676,9 @@ if "exec_data" in st.session_state:
     st.divider()
     st.subheader("📋 Enviar Estado de Cuenta a Clientes")
     st.markdown(
-        "Envía el estado de cuenta completo (facturas vigentes **y** vencidas) "
-        "a todos los clientes. Recomendado enviar cada **lunes** al subir el archivo."
+        "Envía el estado de cuenta a clientes **sin deuda vencida**. "
+        "Los clientes con mora ya reciben el aviso de cobranza. "
+        "Recomendado enviar cada **lunes** al subir el archivo."
     )
 
     import datetime as _dt
@@ -688,10 +689,20 @@ if "exec_data" in st.session_state:
     if not smtp_ok:
         st.warning("Configura las credenciales SMTP para habilitar el envío.")
     else:
-        # Recopilar todos los clientes con cualquier saldo
+        # RUTs que ya reciben aviso de cobranza (tienen deuda vencida)
+        ruts_morosos = {
+            c["rut"]
+            for e in exec_data
+            for c in e["clientes"]
+            if c["vencido"] > 0
+        }
+
+        # Solo clientes SIN deuda vencida (los morosos ya reciben aviso de cobranza)
         all_clients_stmt = []
         for e in exec_data:
             for c in e["clientes"]:
+                if c["rut"] in ruts_morosos:
+                    continue
                 all_invoices = c.get("all_invoices") or c.get("invoices", [])
                 if all_invoices:
                     all_clients_stmt.append({
