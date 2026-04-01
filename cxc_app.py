@@ -583,6 +583,8 @@ if "exec_data" in st.session_state:
     fecha           = st.session_state["fecha"]
     emails_cobranza = st.session_state.get("emails_cobranza", {})
     email_cfg       = load_email_config()
+    exec_emails     = email_cfg.get("ejecutivos", {})
+    gestor_email    = email_cfg.get("gestor", "")
     smtp_cfg        = email_cfg.get("smtp", {})
     smtp_ok         = bool(smtp_cfg.get("user") and smtp_cfg.get("password")
                            and "xxxx" not in smtp_cfg.get("password", ""))
@@ -650,8 +652,7 @@ if "exec_data" in st.session_state:
                                 report_date=fecha,
                             )
                             # CC: ejecutivo a cargo + gestor
-                            exec_email   = exec_emails.get(c["ejecutivo"], "")
-                            gestor_email = email_cfg.get("gestor", "")
+                            exec_email = exec_emails.get(c["ejecutivo"], "")
                             cc = [e for e in [exec_email, gestor_email] if e and e != to]
                             send_email(
                                 email_cfg, [to],
@@ -678,6 +679,8 @@ if "exec_data" in st.session_state:
     fecha           = st.session_state["fecha"]
     emails_cobranza = st.session_state.get("emails_cobranza", {})
     email_cfg       = load_email_config()
+    exec_emails_ec  = email_cfg.get("ejecutivos", {})
+    gestor_email_ec = email_cfg.get("gestor", "")
     smtp_cfg        = email_cfg.get("smtp", {})
     smtp_ok         = bool(smtp_cfg.get("user") and smtp_cfg.get("password")
                            and "xxxx" not in smtp_cfg.get("password", ""))
@@ -760,9 +763,8 @@ if "exec_data" in st.session_state:
                             report_date=fecha,
                         )
                         # CC: ejecutivo a cargo + gestor
-                        exec_email_cc = exec_emails.get(c["ejecutivo"], "")
-                        gestor_cc     = email_cfg.get("gestor", "")
-                        cc = [e for e in [exec_email_cc, gestor_cc] if e and e != to]
+                        exec_email_cc = exec_emails_ec.get(c["ejecutivo"], "")
+                        cc = [e for e in [exec_email_cc, gestor_email_ec] if e and e != to]
                         send_email(
                             email_cfg, [to],
                             f"Tu Estado de Cuenta Semanal — Cervecería Kross — {fecha}",
