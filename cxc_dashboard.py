@@ -801,7 +801,9 @@ def generate_client_collection_email(cliente, rut, ejecutivo, facturas, total_ve
 
     <p style="font-size:15px;color:#111;margin-bottom:8px">Estimado/a cliente,</p>
     <p style="font-size:14px;color:#444;line-height:1.6;margin-bottom:20px">
-      Nos comunicamos para informarle que registra facturas con saldo pendiente de pago.
+      Como parte de nuestra <strong>nueva modalidad de gestión de cobranza</strong>,
+      a partir de ahora recibirá comunicaciones periódicas sobre el estado de su cuenta.<br><br>
+      En esta ocasión le informamos que registra facturas con <strong>saldo pendiente de pago</strong>.
       Le solicitamos gestionar la regularización a la brevedad posible.
     </p>
 
@@ -967,9 +969,10 @@ def generate_client_statement_email(cliente, rut, ejecutivo, all_invoices, repor
 
     <p style="font-size:15px;color:#111;margin-bottom:6px">Estimado/a cliente,</p>
     <p style="font-size:13px;color:#555;line-height:1.6;margin-bottom:22px">
-      Como parte de nuestro compromiso con la transparencia, le enviamos su
-      <strong>estado de cuenta semanal</strong> al <strong>{report_date}</strong>.<br>
-      Aquí encontrará el detalle de todos sus documentos vigentes y vencidos con Cervecería Kross.
+      Como parte de nuestra <strong>nueva modalidad de gestión de cobranza</strong>,
+      a partir de ahora recibirá cada semana su estado de cuenta actualizado.<br><br>
+      A continuación encontrará el detalle de su cuenta al <strong>{report_date}</strong>
+      con todos sus documentos vigentes y vencidos con Cervecería Kross.
       Si tiene alguna consulta, no dude en contactarse con su ejecutivo de cuenta.
     </p>
 
