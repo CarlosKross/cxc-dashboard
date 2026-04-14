@@ -123,8 +123,8 @@ def _parse_email_cobranza_df(df):
     if not rut_col:
         return {}
     cols = list(df.columns)
-    # Columna AO = índice 40 (base 0)
-    email_col = cols[40] if len(cols) > 40 else None
+    # Columna AP = índice 41 (base 0)
+    email_col = cols[41] if len(cols) > 41 else None
     if not email_col:
         return {}
     lookup = {}
