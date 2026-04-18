@@ -1,107 +1,110 @@
 import streamlit as st
 import pandas as pd
-import os
-from datetime import date, datetime
+import json
+import shutil
+from datetime import date
 from pathlib import Path
 
-# ── Config ────────────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Beer Ambassador · Kross",
-    page_icon="🍺",
-    layout="wide",
-)
+st.set_page_config(page_title="Beer Ambassador · Kross", page_icon="🍺", layout="wide")
 
-DATA_PATH = Path(__file__).parent / "data" / "beer_ambassador_visitas.csv"
+DATA_PATH  = Path(__file__).parent / "data" / "beer_ambassador_visitas.csv"
+FOTOS_PATH = Path(__file__).parent / "data" / "fotos"
 
-COLUMNAS = [
-    "fecha", "pdv", "tipo_visita", "ambassador",
-    # Ejecución Comercial
-    "portafolio_activo", "quiebre_stock", "lineas_conectadas", "rotacion_lenta",
-    "temperatura_correcta", "espuma_adecuada", "vasos_correctos", "recomendacion_activa", "equipo_capacitado",
-    "visible_en_carta", "descripcion_atractiva", "destacada_campana", "marca_bien_escrita",
-    "notas_ejecucion",
-    # Identidad y Branding
-    "material_pop_vigente", "material_limpio", "lineamiento_marca",
-    "competencia_visual", "posicion_correcta", "transmite_calidad",
-    "notas_branding",
-    # Experiencia de Marca
-    "staff_describe_variedades", "saben_mas_premiada", "recomiendan_maridaje",
-    "hay_degustacion", "incentivo_staff", "venta_cruzada",
-    "storytelling", "menciona_chilena_premiada",
-    "propuesta_maridaje", "propuesta_cocteleria",
-    "notas_experiencia",
-    # Data & Métricas
-    "participacion_categoria", "precio_vs_competencia", "competidor_activando", "cambio_administrador",
-    "notas_data",
-    # Prospección (cuenta nueva)
-    "es_prospecto",
-    "tipo_local", "ticket_promedio", "perfil_publico",
-    "capacidad_pax", "volumen_potencial",
-    "tipo_cocina", "enfoque_maridaje", "eventos_musica",
-    "tiene_schop", "num_lineas", "marcas_conectadas",
-    "precio_competencia_schop", "espacio_nueva_linea",
-    "condiciones_comerciales",
-    "notas_prospeccion",
-    # Score
-    "score_pct",
+DIAS = {
+    0: ("Lunes",     "📋 Planificación", "Reunión comercial + contacto y filtro de prospectos"),
+    1: ("Martes",    "🚶 Gestión",        "Visita y ruta de nuevos prospectos + cápsulas por variedad"),
+    2: ("Miércoles", "🤝 Conversión",     "Cierre técnico nuevos prospectos + prospección en frío"),
+    3: ("Jueves",    "🎓 Capacitación",   "Capacitación PDV (Staff) + Auditoría Técnica (Check List)"),
+    4: ("Viernes",   "🎉 Activaciones",   "Implementación de activaciones/sampling + Cata VIP o Beer Dinners"),
+    5: ("Sábado",    "📊 Revisión",       "Revisar KPIs de la semana"),
+    6: ("Domingo",   "☀️ Descanso",       "Preparar agenda de la semana siguiente"),
+}
+
+METAS = {
+    "Prospección y Cierres":  (5,  0.40),
+    "Implementación Promos":  (5,  0.20),
+    "Capacitación PDV":       (10, 0.20),
+    "Auditorías Calidad":     (20, 0.20),
+}
+
+VARIEDADES_KROSS = [
+    "Golden Ale", "Maibock", "Stout", "IPA", "Weizen",
+    "Pale Ale", "Red Ale", "Pilsner", "Porter", "Otra",
 ]
 
-DIAS = {0: ("Lunes", "📋 Planificación", "Reunión comercial + contacto y filtro de prospectos"),
-        1: ("Martes", "🚶 Gestión", "Visita y ruta de nuevos prospectos + cápsulas por variedad"),
-        2: ("Miércoles", "🤝 Conversión", "Cierre técnico nuevos prospectos + prospección en frío"),
-        3: ("Jueves", "🎓 Capacitación", "Capacitación PDV (Staff) + Auditoría Técnica (Check List)"),
-        4: ("Viernes", "🎉 Activaciones", "Implementación de activaciones/sampling + Cata VIP o Beer Dinners"),
-        5: ("Sábado", "📊 Revisión", "Revisar KPIs de la semana"),
-        6: ("Domingo", "☀️ Descanso", "Preparar agenda de la semana siguiente")}
+# ── Helpers de datos ──────────────────────────────────────────────────────────
 
-METAS = {"Prospección y Cierres": (5, 0.40),
-         "Implementación Promos": (5, 0.20),
-         "Capacitación PDV": (10, 0.20),
-         "Auditorías Calidad": (20, 0.20)}
-
-
-# ── Persistencia ──────────────────────────────────────────────────────────────
 def load_visitas():
     if DATA_PATH.exists():
-        df = pd.read_csv(DATA_PATH)
-        for col in COLUMNAS:
-            if col not in df.columns:
-                df[col] = None
-        return df
-    return pd.DataFrame(columns=COLUMNAS)
+        return pd.read_csv(DATA_PATH)
+    return pd.DataFrame()
 
 
-def save_visita(row: dict):
+def save_visita(row: dict, fotos: dict):
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Guardar fotos
+    slug = f"{row['fecha']}_{row['pdv'].replace(' ', '_')[:20]}"
+    fotos_paths = {}
+    for seccion, archivos in fotos.items():
+        if archivos:
+            carpeta = FOTOS_PATH / slug / seccion
+            carpeta.mkdir(parents=True, exist_ok=True)
+            rutas = []
+            for f in archivos:
+                dest = carpeta / f.name
+                dest.write_bytes(f.getbuffer())
+                rutas.append(str(dest))
+            fotos_paths[seccion] = rutas
+    row["fotos_json"] = json.dumps(fotos_paths, ensure_ascii=False)
     df = load_visitas()
-    new_row = {col: row.get(col, None) for col in COLUMNAS}
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
     df.to_csv(DATA_PATH, index=False)
 
 
-# ── Cálculo KPIs ──────────────────────────────────────────────────────────────
-def calc_kpis(df: pd.DataFrame, mes: int, anio: int):
+def calc_kpis(df, mes, anio):
     if df.empty:
-        return {"Prospección y Cierres": 0, "Implementación Promos": 0,
-                "Capacitación PDV": 0, "Auditorías Calidad": 0}
+        return {k: 0 for k in METAS}
+    df = df.copy()
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
-    mask = (df["fecha"].dt.month == mes) & (df["fecha"].dt.year == anio)
-    mes_df = df[mask]
+    m = (df["fecha"].dt.month == mes) & (df["fecha"].dt.year == anio)
+    d = df[m]
     return {
-        "Prospección y Cierres": int(mes_df[mes_df["es_prospecto"] == True].shape[0]),
-        "Implementación Promos": int(mes_df[mes_df["hay_degustacion"] == True].shape[0]),
-        "Capacitación PDV": int(mes_df[mes_df["staff_describe_variedades"] == True].shape[0]),
-        "Auditorías Calidad": int(mes_df[mes_df["tipo_visita"] == "Auditoría"].shape[0]),
+        "Prospección y Cierres": int((d.get("tipo_visita", pd.Series()) == "Prospección").sum()),
+        "Implementación Promos": int((d.get("tiene_activacion", pd.Series()) == True).sum()),
+        "Capacitación PDV":      int((d.get("tipo_visita", pd.Series()) == "Capacitación").sum()),
+        "Auditorías Calidad":    int((d.get("tipo_visita", pd.Series()) == "Auditoría").sum()),
     }
 
 
-# ── UI helpers ────────────────────────────────────────────────────────────────
-def pregunta(label, key, default=False):
-    return st.checkbox(label, value=default, key=key)
+def save_fotos_uploader(label, key, seccion_dict, seccion_key):
+    archivos = st.file_uploader(
+        label, type=["jpg", "jpeg", "png", "webp", "heic"],
+        accept_multiple_files=True, key=key,
+    )
+    if archivos:
+        seccion_dict[seccion_key] = archivos
+        st.caption(f"📎 {len(archivos)} foto(s) adjunta(s)")
 
 
-def seccion(titulo, emoji):
+def rating(label, key, ayuda=""):
+    cols = st.columns([3, 2])
+    with cols[0]:
+        st.markdown(f"**{label}**")
+        if ayuda:
+            st.caption(ayuda)
+    with cols[1]:
+        return st.select_slider("", options=[1, 2, 3, 4, 5],
+                                 value=3, key=key,
+                                 label_visibility="collapsed",
+                                 format_func=lambda x: {1:"⭐ Pésimo", 2:"⭐⭐ Malo",
+                                                          3:"⭐⭐⭐ Regular", 4:"⭐⭐⭐⭐ Bueno",
+                                                          5:"⭐⭐⭐⭐⭐ Excelente"}[x])
+
+
+def seccion_header(titulo, emoji, descripcion=""):
     st.markdown(f"### {emoji} {titulo}")
+    if descripcion:
+        st.caption(descripcion)
     st.markdown("---")
 
 
@@ -125,309 +128,458 @@ def pagina_dashboard():
         pct = min(actual / meta, 1.0)
         color = "🟢" if pct >= 1.0 else ("🟡" if pct >= 0.75 else "🔴")
         with cols[i]:
-            st.metric(label=nombre, value=f"{actual}/{meta}",
-                      delta=f"{pct*100:.0f}% ({int(pond*100)}% pond.)")
+            st.metric(nombre, f"{actual}/{meta}", delta=f"{int(pct*100)}%")
             st.progress(pct)
-            st.caption(f"{color} Meta: {meta} · Pond. {int(pond*100)}%")
+            st.caption(f"{color} Pond. {int(pond*100)}%")
 
     st.markdown("---")
     st.subheader("📅 Calendario semanal")
-    cal_cols = st.columns(5)
-    for i, (dia_n, (dia_nombre, foco, desc)) in enumerate(list(DIAS.items())[:5]):
-        with cal_cols[i]:
-            activo = hoy.weekday() == dia_n
-            st.markdown(f"{'**' if activo else ''}{dia_nombre}{'**' if activo else ''}")
+    cal = st.columns(5)
+    for i, (dn, (nombre, foco, desc)) in enumerate(list(DIAS.items())[:5]):
+        with cal[i]:
+            activo = hoy.weekday() == dn
+            st.markdown(f"{'**' if activo else ''}{nombre}{'**' if activo else ''}")
             st.caption(foco)
             if activo:
                 st.success(desc)
             else:
-                st.text(desc[:40] + "…")
+                st.text(desc[:45] + "…")
 
+
+# ── AUDITORÍA ─────────────────────────────────────────────────────────────────
+
+def form_auditoria(base, fotos):
+
+    # 1. Ejecución Comercial
+    seccion_header("1. Ejecución Comercial", "🛒", "Disponibilidad, carta y visibilidad en el punto")
+
+    st.markdown("**Disponibilidad**")
+    c1, c2 = st.columns(2)
+    with c1:
+        base["portafolio_activo"] = st.checkbox("¿Todo el portafolio acordado activo?", key="pa")
+        base["quiebre_stock"]     = st.checkbox("¿Hay quiebres de stock?", key="qs")
+    with c2:
+        base["lineas_conectadas"] = st.checkbox("¿Líneas comprometidas conectadas?", key="lc")
+        base["rotacion_lenta"]    = st.checkbox("¿Algún SKU con rotación lenta?", key="rl")
+
+    st.markdown("**Carta y Visibilidad**")
+    c1, c2 = st.columns(2)
+    with c1:
+        base["visible_carta"]        = st.checkbox("¿Kross visible en carta?", key="vc")
+        base["descripcion_atractiva"] = st.checkbox("¿Descripción atractiva?", key="da")
+    with c2:
+        base["destacada_campana"]    = st.checkbox("¿Maibock/Golden destacada (campaña vigente)?", key="dc")
+        base["marca_bien_escrita"]   = st.checkbox("¿Marca correctamente escrita?", key="mbe")
+
+    save_fotos_uploader("📷 Fotos de carta / visibilidad", "fotos_carta", fotos, "carta")
+    base["notas_ejecucion"] = st.text_area("Observaciones ejecución comercial",
+                                            placeholder="Ej: quiebre en Golden, carta desactualizada…", key="ne")
+
+    st.markdown("---")
+
+    # 2. Prueba de variedades en barra
+    seccion_header("2. Prueba de Variedades en Barra", "🍺",
+                   "El Beer Ambassador prueba cada variedad conectada y evalúa temperatura, espuma, sabor y servicio")
+
+    if "variedades" not in st.session_state:
+        st.session_state.variedades = []
+
+    col_add, col_clear = st.columns([2, 1])
+    with col_add:
+        nueva = st.selectbox("Seleccionar variedad conectada", [""] + VARIEDADES_KROSS, key="nueva_variedad")
+    with col_clear:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("➕ Agregar variedad", use_container_width=True):
+            if nueva and nueva not in [v["nombre"] for v in st.session_state.variedades]:
+                st.session_state.variedades.append({
+                    "nombre": nueva, "temp": 3, "espuma": 3, "sabor": 3,
+                    "vaso_correcto": True, "obs": ""
+                })
+
+    for idx, v in enumerate(st.session_state.variedades):
+        with st.expander(f"🍺 {v['nombre']}", expanded=True):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                v["temp"]   = st.select_slider("Temperatura", [1,2,3,4,5], value=v["temp"],
+                                                key=f"temp_{idx}",
+                                                format_func=lambda x: {1:"Muy caliente",2:"Caliente",
+                                                3:"Aceptable",4:"Fría",5:"Perfecta"}[x])
+            with c2:
+                v["espuma"] = st.select_slider("Espuma", [1,2,3,4,5], value=v["espuma"],
+                                                key=f"espuma_{idx}",
+                                                format_func=lambda x: {1:"Excesiva",2:"Mucha",
+                                                3:"Aceptable",4:"Buena",5:"Perfecta"}[x])
+            with c3:
+                v["sabor"]  = st.select_slider("Sabor / Calidad", [1,2,3,4,5], value=v["sabor"],
+                                                key=f"sabor_{idx}",
+                                                format_func=lambda x: {1:"Deficiente",2:"Malo",
+                                                3:"Regular",4:"Bueno",5:"Excelente"}[x])
+            v["vaso_correcto"] = st.checkbox("¿Vaso correcto con marca visible?", value=v["vaso_correcto"], key=f"vaso_{idx}")
+            v["obs"] = st.text_input("Observación de esta variedad", value=v["obs"],
+                                      placeholder="Ej: línea con sabor a jabón, temperatura alta", key=f"obs_{idx}")
+            save_fotos_uploader(f"📷 Foto del vaso — {v['nombre']}", f"foto_var_{idx}", fotos, f"variedad_{v['nombre']}")
+            if st.button(f"🗑️ Quitar {v['nombre']}", key=f"del_{idx}"):
+                st.session_state.variedades.pop(idx)
+                st.rerun()
+
+    base["variedades_json"] = json.dumps(st.session_state.variedades, ensure_ascii=False)
+    prom_sabor = (sum(v["sabor"] for v in st.session_state.variedades) /
+                  max(len(st.session_state.variedades), 1))
+    base["score_variedades"] = round(prom_sabor / 5 * 100, 1)
+
+    if st.session_state.variedades:
+        st.caption(f"Promedio calidad barra: **{prom_sabor:.1f}/5** ({base['score_variedades']}%)")
+
+    st.markdown("---")
+
+    # 3. Identidad y Branding
+    seccion_header("3. Identidad y Branding", "🎨")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        base["pop_vigente"]       = st.checkbox("¿Material POP vigente?", key="pv")
+        base["pop_limpio"]        = st.checkbox("¿POP limpio y en buen estado?", key="pl")
+    with c2:
+        base["lineamiento_marca"] = st.checkbox("¿Respeta lineamiento de marca?", key="lm")
+        base["posicion_correcta"] = st.checkbox("¿Bien posicionada vs competencia?", key="pc")
+    with c3:
+        base["transmite_calidad"] = st.checkbox("¿El punto transmite calidad Kross?", key="tc")
+    save_fotos_uploader("📷 Fotos de POP y branding", "fotos_pop", fotos, "branding")
+    base["notas_branding"] = st.text_area("Observaciones branding",
+                                           placeholder="Ej: cartel sucio, mal posicionado junto a competencia", key="nb")
+
+    st.markdown("---")
+
+    # 4. Data & Métricas
+    seccion_header("4. Data & Métricas", "📊", "Contexto competitivo y alertas del punto")
+    c1, c2 = st.columns(2)
+    with c1:
+        base["participacion"]         = st.text_input("Participación Kross en categoría",
+                                                       placeholder="Ej: 2 de 6 líneas schop", key="part")
+        base["precio_vs_competencia"] = st.text_input("Precio Kross vs competencia",
+                                                       placeholder="Ej: +$500 sobre Heineken", key="pvc")
+    with c2:
+        base["competidor_fuerte"]     = st.text_input("Competidor activando fuerte",
+                                                       placeholder="Ej: Kunstmann con promotora los viernes", key="cf")
+        base["cambio_administrador"]  = st.text_input("Cambio de administrador / dueño",
+                                                       placeholder="Ej: nuevo dueño desde abril", key="ca")
+    base["notas_data"] = st.text_area("Observaciones data & métricas", key="nd")
+
+
+# ── CAPACITACIÓN ──────────────────────────────────────────────────────────────
+
+def form_capacitacion(base, fotos):
+
+    seccion_header("1. Diagnóstico Previo del Staff", "🔍",
+                   "Evalúa el nivel de conocimiento ANTES de la capacitación (1=No sabe, 5=Experto)")
+    c1, c2 = st.columns(2)
+    with c1:
+        base["diag_variedades"]  = rating("Conoce las variedades Kross", "dv",
+                                           "¿Sabe nombrar y describir cada estilo?")
+        base["diag_premiada"]    = rating("Sabe cuál es la más premiada", "dp",
+                                           "La cervecería chilena más premiada del mundo")
+    with c2:
+        base["diag_maridaje"]    = rating("Recomienda maridajes", "dm",
+                                           "¿Orienta al cliente según la comida?")
+        base["diag_servicio"]    = rating("Servicio técnico", "ds",
+                                           "Temperatura, espuma, vaso correcto")
+
+    st.markdown("---")
+    seccion_header("2. Temas Capacitados", "📚", "Marca todo lo que se cubrió en esta visita")
+    temas = [
+        "Historia y origen de Kross",
+        "Variedades y estilos (descripción en palabras simples)",
+        "La cervecería chilena más premiada del mundo",
+        "Servicio técnico (temperatura, espuma, vaso)",
+        "Maridajes según carta del local",
+        "Up-selling y venta activa",
+        "Coctelería con Kross",
+        "Storytelling para recomendar al cliente",
+        "Activaciones y degustaciones",
+    ]
+    temas_sel = []
+    c1, c2 = st.columns(2)
+    for i, tema in enumerate(temas):
+        col = c1 if i % 2 == 0 else c2
+        with col:
+            if st.checkbox(tema, key=f"tema_{i}"):
+                temas_sel.append(tema)
+    base["temas_capacitados"] = ", ".join(temas_sel)
+
+    st.markdown("---")
+    seccion_header("3. Evaluación Post-Capacitación", "✅",
+                   "Nivel del staff AL TERMINAR la capacitación")
+    c1, c2 = st.columns(2)
+    with c1:
+        base["post_variedades"] = rating("Describe variedades correctamente", "pv2")
+        base["post_premiada"]   = rating("Menciona la más premiada", "pp2")
+    with c2:
+        base["post_maridaje"]   = rating("Recomienda maridaje", "pm2")
+        base["post_servicio"]   = rating("Servicio técnico", "ps2")
+
+    mejora = ((base.get("post_variedades",3) + base.get("post_maridaje",3) +
+               base.get("post_servicio",3)) -
+              (base.get("diag_variedades",3) + base.get("diag_maridaje",3) +
+               base.get("diag_servicio",3)))
+    base["mejora_capacitacion"] = mejora
+    if mejora > 0:
+        st.success(f"📈 Mejora neta de la sesión: +{mejora} puntos")
+    elif mejora == 0:
+        st.info("Sin cambio medible en esta sesión")
+    else:
+        st.warning(f"⚠️ Puntuación bajó {mejora} (revisar metodología)")
+
+    st.markdown("---")
+    seccion_header("4. Compromisos y Seguimiento", "📝")
+    base["compromisos"]      = st.text_area("Compromisos adquiridos por el staff / administrador",
+                                             placeholder="Ej: van a recomendar maridaje con el menú de temporada", key="comp")
+    base["proxima_accion"]   = st.text_input("Próxima acción de seguimiento",
+                                              placeholder="Ej: revisitar en 2 semanas para evaluar", key="prox")
+    base["personas_capacitadas"] = st.number_input("N° de personas capacitadas", min_value=1, value=2, key="npax")
+    save_fotos_uploader("📷 Fotos de la capacitación", "fotos_cap", fotos, "capacitacion")
+    base["notas_capacitacion"] = st.text_area("Notas generales", key="ncap")
+
+
+# ── ACTIVACIÓN ────────────────────────────────────────────────────────────────
+
+def form_activacion(base, fotos):
+
+    seccion_header("1. Tipo de Activación", "🎉")
+    tipos_act = st.multiselect("¿Qué tipo(s) de activación se realizó?",
+                                ["Degustación / Sampling", "Cata guiada", "Beer Dinner",
+                                 "Maridaje con menú", "Coctelería Kross", "Trivia cervecera",
+                                 "Happy Hour Kross", "Lanzamiento de variedad", "Otra"],
+                                key="tipos_act")
+    base["tipos_activacion"] = ", ".join(tipos_act)
+    base["tiene_activacion"] = len(tipos_act) > 0
+
+    st.markdown("---")
+    seccion_header("2. Variedades Activadas", "🍺")
+    vars_act = st.multiselect("Variedades que se sirvieron / destacaron", VARIEDADES_KROSS, key="vars_act")
+    base["variedades_activadas"] = ", ".join(vars_act)
+    base["material_pop_usado"]   = st.checkbox("¿Se usó material POP de Kross?", key="mpu")
+    base["incentivo_staff"]      = st.checkbox("¿Hubo incentivo al staff?", key="is_act")
+    base["venta_cruzada"]        = st.checkbox("¿Se empujó venta cruzada (tabla, merch, etc.)?", key="vc_act")
+
+    st.markdown("---")
+    seccion_header("3. Resultados", "📊")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        base["asistentes_estimados"] = st.number_input("Asistentes estimados", min_value=0, value=0, key="asist")
+    with c2:
+        base["pintas_vendidas"]      = st.number_input("Pintas / jarras vendidas (aprox.)", min_value=0, value=0, key="pintas")
+    with c3:
+        base["rating_activacion"]    = st.select_slider("Éxito de la activación", [1,2,3,4,5], value=3,
+                                                          key="rat_act",
+                                                          format_func=lambda x: {1:"Muy baja",2:"Baja",
+                                                          3:"Regular",4:"Buena",5:"Excelente"}[x])
+    base["storytelling_ok"]  = st.checkbox("¿Se contó la historia de la marca?", key="story_act")
+    base["menciona_premiada"] = st.checkbox("¿Se mencionó que es chilena y más premiada del mundo?", key="mp_act")
+    base["propuesta_maridaje"]   = st.text_input("Maridaje propuesto / destacado",
+                                                   placeholder="Ej: Stout + tabla de quesos", key="pm_act")
+    base["propuesta_cocteleria"] = st.text_input("Coctelería destacada",
+                                                   placeholder="Ej: Shandy con Maibock", key="pc_act")
+
+    st.markdown("---")
+    save_fotos_uploader("📷 Fotos de la activación (ambiente, producto, gente)", "fotos_act", fotos, "activacion")
+    base["notas_activacion"] = st.text_area("Observaciones de la activación", key="nact")
+
+
+# ── PROSPECCIÓN ───────────────────────────────────────────────────────────────
+
+def form_prospeccion(base, fotos):
+
+    seccion_header("1. Perfil del Local", "🗺️")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        base["tipo_local"]        = st.selectbox("Posicionamiento", ["Premium", "Masivo", "Craft especializado", "Otro"], key="tl")
+        base["ticket_promedio"]   = st.text_input("Ticket promedio estimado", placeholder="Ej: $18.000", key="tp")
+    with c2:
+        base["perfil_publico"]    = st.text_input("Público predominante", placeholder="Ej: 25-40, NSE medio-alto", key="pp")
+        base["capacidad_pax"]     = st.text_input("Capacidad máx. (pax)", placeholder="Ej: 80 pax", key="cpax")
+    with c3:
+        base["volumen_potencial"] = st.text_input("Volumen potencial (barriles/mes)", placeholder="Ej: 2 barriles", key="vp")
+        base["potencial_rating"]  = st.select_slider("Potencial del local", [1,2,3,4,5], value=3, key="pot_r",
+                                                       format_func=lambda x: {1:"Muy bajo",2:"Bajo",
+                                                       3:"Medio",4:"Alto",5:"Muy alto"}[x])
+
+    st.markdown("---")
+    seccion_header("2. Concepto Gastronómico", "🍽️")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        base["tipo_cocina"]      = st.text_input("Tipo de cocina", placeholder="Ej: Americana, Mediterránea", key="tcocina")
+    with c2:
+        base["enfoque_maridaje"] = st.text_input("Enfoque maridaje", placeholder="Ej: Tapas, tabla quesos", key="em")
+    with c3:
+        base["eventos_musica"]   = st.text_input("Eventos / música", placeholder="Ej: DJ viernes, trivia martes", key="evm")
+
+    st.markdown("---")
+    seccion_header("3. Infraestructura Cervecera", "🔧")
+    c1, c2 = st.columns(2)
+    with c1:
+        base["tiene_schop"]          = st.checkbox("¿Tiene schop?", key="tschop")
+        base["num_lineas"]           = st.text_input("¿Cuántas líneas?", placeholder="Ej: 4 líneas", key="nl")
+        base["marcas_conectadas"]    = st.text_input("Marcas conectadas actualmente", placeholder="Ej: Heineken, Corona", key="mc")
+    with c2:
+        base["precio_competencia"]   = st.text_input("Precio pinta competencia", placeholder="Ej: $3.500", key="pcomp")
+        base["espacio_nueva_linea"]  = st.checkbox("¿Hay espacio para nueva línea Kross?", key="enl")
+        base["condiciones_actuales"] = st.text_area("Condiciones comerciales actuales (aporte, rappel, trademarketing)",
+                                                     height=80, key="cond")
+
+    st.markdown("---")
+    seccion_header("4. Próximos Pasos", "🎯")
+    base["decision_maker"]   = st.text_input("Nombre del tomador de decisión (dueño / admin)",
+                                              placeholder="Ej: Pedro Soto, administrador", key="dm")
+    base["contacto"]         = st.text_input("Teléfono / email de contacto", key="cont")
+    base["proxima_reunion"]  = st.text_input("Próxima reunión pactada", placeholder="Ej: Lunes 25 a las 11:00", key="pr")
+    base["temperatura_lead"] = st.select_slider("Temperatura del lead", [1,2,3,4,5], value=3, key="tl2",
+                                                 format_func=lambda x: {1:"Frío",2:"Tibio",
+                                                 3:"Interesado",4:"Caliente",5:"Cierre inminente"}[x])
+    save_fotos_uploader("📷 Fotos del local (fachada, interior, barra)", "fotos_pros", fotos, "prospeccion")
+    base["notas_prospeccion"] = st.text_area("Observaciones generales del prospecto", key="np")
+
+
+# ── CHECK LIST PAGE ───────────────────────────────────────────────────────────
 
 def pagina_checklist():
     st.title("✅ Check List de Visita PDV")
-    df = load_visitas()
 
-    with st.form("visita_form", clear_on_submit=True):
-        # Cabecera
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            fecha = st.date_input("Fecha", value=date.today())
-        with col2:
-            pdv = st.text_input("Nombre del PDV *", placeholder="Ej: Bar La Canela")
-        with col3:
-            tipo_visita = st.selectbox("Tipo de visita", ["Auditoría", "Capacitación", "Activación", "Prospección"])
-        with col4:
-            ambassador = st.text_input("Beer Ambassador", placeholder="Tu nombre")
+    # Cabecera común
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        fecha = st.date_input("Fecha", value=date.today())
+    with c2:
+        pdv = st.text_input("Nombre del PDV *", placeholder="Ej: Bar La Canela")
+    with c3:
+        tipo_visita = st.selectbox("Tipo de visita *",
+                                   ["Auditoría", "Capacitación", "Activación", "Prospección"])
+    with c4:
+        ambassador = st.text_input("Beer Ambassador", placeholder="Tu nombre")
 
+    st.markdown("---")
+
+    base  = {"fecha": str(fecha), "pdv": pdv, "tipo_visita": tipo_visita, "ambassador": ambassador}
+    fotos = {}
+
+    if tipo_visita == "Auditoría":
+        form_auditoria(base, fotos)
+    elif tipo_visita == "Capacitación":
+        form_capacitacion(base, fotos)
+    elif tipo_visita == "Activación":
+        form_activacion(base, fotos)
+    elif tipo_visita == "Prospección":
+        form_prospeccion(base, fotos)
+
+    # Compromisos / próximos pasos (común a todos excepto capacitación que ya los tiene)
+    if tipo_visita in ("Auditoría", "Activación"):
         st.markdown("---")
+        seccion_header("Compromisos y Próximos Pasos", "📝")
+        base["compromisos"]    = st.text_area("Compromisos pactados con el punto",
+                                               placeholder="Ej: van a actualizar la carta la semana que viene", key="comp_gen")
+        base["proxima_accion"] = st.text_input("Próxima acción de seguimiento",
+                                                placeholder="Ej: revisitar el jueves próximo", key="prox_gen")
 
-        # ── 1. Ejecución Comercial ────────────────────────────────────────────
-        seccion("1. Ejecución Comercial", "🛒")
-        st.markdown("**Disponibilidad**")
-        c1, c2 = st.columns(2)
-        with c1:
-            portafolio_activo   = pregunta("¿Todo el portafolio acordado activo?", "portafolio_activo")
-            quiebre_stock       = pregunta("¿Hay quiebres de stock?", "quiebre_stock")
-        with c2:
-            lineas_conectadas   = pregunta("¿Líneas comprometidas conectadas?", "lineas_conectadas")
-            rotacion_lenta      = pregunta("¿Hay rotación lenta en algún SKU?", "rotacion_lenta")
+    st.markdown("---")
+    col_btn, col_info = st.columns([1, 2])
+    with col_btn:
+        guardar = st.button("💾 Guardar visita", use_container_width=True, type="primary")
+    with col_info:
+        n_fotos = sum(len(v) for v in fotos.values() if v)
+        st.caption(f"📎 {n_fotos} foto(s) adjunta(s) en total")
 
-        st.markdown("**Calidad de Servicio**")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            temperatura_correcta = pregunta("¿Temperatura correcta?", "temperatura_correcta")
-            espuma_adecuada      = pregunta("¿Espuma adecuada?", "espuma_adecuada")
-        with c2:
-            vasos_correctos      = pregunta("¿Vasos correctos (marca visible)?", "vasos_correctos")
-            recomendacion_activa = pregunta("¿Se ofrece recomendación activa?", "recomendacion_activa")
-        with c3:
-            equipo_capacitado    = pregunta("¿Equipo capacitado?", "equipo_capacitado")
-
-        st.markdown("**Carta y Visibilidad**")
-        c1, c2 = st.columns(2)
-        with c1:
-            visible_en_carta    = pregunta("¿Kross visible en carta?", "visible_en_carta")
-            descripcion_atractiva = pregunta("¿Tiene descripción atractiva?", "descripcion_atractiva")
-        with c2:
-            destacada_campana   = pregunta("¿Destacada Maibock/Golden (campaña vigente)?", "destacada_campana")
-            marca_bien_escrita  = pregunta("¿Marca correctamente escrita?", "marca_bien_escrita")
-
-        notas_ejecucion = st.text_area("Notas Ejecución Comercial", key="notas_ejecucion", height=70)
-
-        # ── 2. Identidad y Branding ───────────────────────────────────────────
-        seccion("2. Identidad y Branding", "🎨")
-        st.markdown("**Material POP**")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            material_pop_vigente = pregunta("¿Hay material vigente?", "material_pop_vigente")
-        with c2:
-            material_limpio      = pregunta("¿Limpio y en buen estado?", "material_limpio")
-        with c3:
-            lineamiento_marca    = pregunta("¿Se respeta lineamiento de marca?", "lineamiento_marca")
-
-        st.markdown("**Territorio Visual**")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            competencia_visual   = pregunta("¿La marca compite visualmente con otras?", "competencia_visual")
-        with c2:
-            posicion_correcta    = pregunta("¿Bien posicionada?", "posicion_correcta")
-        with c3:
-            transmite_calidad    = pregunta("¿El punto transmite calidad Kross?", "transmite_calidad")
-
-        notas_branding = st.text_area("Notas Identidad y Branding", key="notas_branding", height=70)
-
-        # ── 3. Experiencia de Marca ───────────────────────────────────────────
-        seccion("3. Experiencia de Marca", "⭐")
-        st.markdown("**Capacitación**")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            staff_describe_variedades = pregunta("¿Staff describe cada variedad?", "staff_describe_variedades")
-        with c2:
-            saben_mas_premiada        = pregunta("¿Saben cuál es la más premiada?", "saben_mas_premiada")
-        with c3:
-            recomiendan_maridaje      = pregunta("¿Recomiendan maridajes?", "recomiendan_maridaje")
-
-        st.markdown("**Activación y Storytelling**")
-        c1, c2 = st.columns(2)
-        with c1:
-            hay_degustacion   = pregunta("¿Hay degustación activa?", "hay_degustacion")
-            incentivo_staff   = pregunta("¿Hay incentivo al staff?", "incentivo_staff")
-            venta_cruzada     = pregunta("¿Se empuja venta cruzada (tabla, merch)?", "venta_cruzada")
-        with c2:
-            storytelling          = pregunta("¿Se cuenta la historia de la marca?", "storytelling")
-            menciona_chilena_premiada = pregunta("¿Se menciona que es chilena y premiada?", "menciona_chilena_premiada")
-
-        st.markdown("**Propuestas**")
-        propuesta_maridaje    = st.text_input("Maridaje propuesto según carta", key="propuesta_maridaje")
-        propuesta_cocteleria  = st.text_input("Propuesta de coctelería (tracción de volumen)", key="propuesta_cocteleria")
-        notas_experiencia     = st.text_area("Notas Experiencia de Marca", key="notas_experiencia", height=70)
-
-        # ── 4. Data & Métricas ────────────────────────────────────────────────
-        seccion("4. Data & Métricas", "📊")
-        c1, c2 = st.columns(2)
-        with c1:
-            participacion_categoria  = st.text_input("Participación Kross en la categoría", key="participacion_categoria", placeholder="Ej: 2 de 5 marcas schop")
-            precio_vs_competencia    = st.text_input("Precio vs competencia", key="precio_vs_competencia", placeholder="Ej: +$500 sobre la media")
-        with c2:
-            competidor_activando     = st.text_input("Competidor activando fuerte", key="competidor_activando", placeholder="Ej: Kunstmann con promotor")
-            cambio_administrador     = st.text_input("Cambio de administrador / dueño", key="cambio_administrador", placeholder="Ej: Nuevo dueño desde mayo")
-        notas_data = st.text_area("Notas Data & Métricas", key="notas_data", height=70)
-
-        # ── 5. Prospección ────────────────────────────────────────────────────
-        seccion("5. Prospección (solo cuenta nueva)", "🔍")
-        es_prospecto = st.checkbox("¿Es un prospecto nuevo?", key="es_prospecto")
-
-        tipo_local = ticket_promedio = perfil_publico = ""
-        capacidad_pax = volumen_potencial = ""
-        tipo_cocina = enfoque_maridaje = eventos_musica = ""
-        tiene_schop = False
-        num_lineas = marcas_conectadas = precio_competencia_schop = ""
-        espacio_nueva_linea = False
-        condiciones_comerciales = notas_prospeccion = ""
-
-        if es_prospecto:
-            st.markdown("**Posicionamiento**")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                tipo_local       = st.selectbox("Tipo de local", ["Premium", "Masivo", "Craft especializado", "Otro"], key="tipo_local")
-                ticket_promedio  = st.text_input("Ticket promedio estimado", key="ticket_promedio", placeholder="Ej: $18.000")
-            with c2:
-                perfil_publico   = st.text_input("Público predominante", key="perfil_publico", placeholder="Ej: 25-40, NSE medio-alto")
-                capacidad_pax    = st.text_input("Capacidad máx. (pax)", key="capacidad_pax", placeholder="Ej: 80 pax")
-            with c3:
-                volumen_potencial = st.text_input("Volumen potencial (barriles/mes)", key="volumen_potencial", placeholder="Ej: 2 barriles/mes")
-
-            st.markdown("**Concepto Gastronómico**")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                tipo_cocina      = st.text_input("Tipo de cocina", key="tipo_cocina", placeholder="Ej: Americana, Mediterránea")
-            with c2:
-                enfoque_maridaje = st.text_input("Enfoque maridaje", key="enfoque_maridaje", placeholder="Ej: Tapas y tabla de quesos")
-            with c3:
-                eventos_musica   = st.text_input("Eventos / música", key="eventos_musica", placeholder="Ej: DJ viernes, trivia martes")
-
-            st.markdown("**Infraestructura Cervecera**")
-            c1, c2 = st.columns(2)
-            with c1:
-                tiene_schop          = pregunta("¿Tiene schop?", "tiene_schop_pros")
-                num_lineas           = st.text_input("¿Cuántas líneas?", key="num_lineas", placeholder="Ej: 4 líneas")
-                marcas_conectadas    = st.text_input("Marcas conectadas actualmente", key="marcas_conectadas", placeholder="Ej: Heineken, Corona")
-            with c2:
-                precio_competencia_schop = st.text_input("Precio pinta competencia", key="precio_competencia_schop", placeholder="Ej: $3.500")
-                espacio_nueva_linea  = pregunta("¿Hay espacio para nueva línea?", "espacio_nueva_linea")
-            condiciones_comerciales = st.text_area("Condiciones comerciales actuales (aporte, rappel, trademarketing)", key="condiciones_comerciales", height=70)
-            notas_prospeccion       = st.text_area("Notas Prospección", key="notas_prospeccion", height=70)
-
-        # ── Score ─────────────────────────────────────────────────────────────
-        st.markdown("---")
-        checks_binarios = [
-            portafolio_activo, lineas_conectadas, temperatura_correcta, espuma_adecuada,
-            vasos_correctos, recomendacion_activa, equipo_capacitado, visible_en_carta,
-            descripcion_atractiva, destacada_campana, marca_bien_escrita,
-            material_pop_vigente, material_limpio, lineamiento_marca,
-            posicion_correcta, transmite_calidad,
-            staff_describe_variedades, saben_mas_premiada, recomiendan_maridaje,
-            hay_degustacion, storytelling, menciona_chilena_premiada,
-        ]
-        score_pct = round(sum(1 for c in checks_binarios if c) / len(checks_binarios) * 100, 1)
-        col_score, _ = st.columns([1, 3])
-        with col_score:
-            color = "🟢" if score_pct >= 85 else ("🟡" if score_pct >= 70 else "🔴")
-            st.metric("Score PDV", f"{score_pct}%", delta=None)
-            st.caption(f"{color} {'Excelente' if score_pct >= 85 else ('Aceptable' if score_pct >= 70 else 'Requiere atención')}")
-
-        submitted = st.form_submit_button("💾 Guardar visita", use_container_width=True, type="primary")
-
-    if submitted:
+    if guardar:
         if not pdv.strip():
             st.error("El campo 'Nombre del PDV' es obligatorio.")
             return
-        row = dict(
-            fecha=str(fecha), pdv=pdv.strip(), tipo_visita=tipo_visita, ambassador=ambassador,
-            portafolio_activo=portafolio_activo, quiebre_stock=quiebre_stock,
-            lineas_conectadas=lineas_conectadas, rotacion_lenta=rotacion_lenta,
-            temperatura_correcta=temperatura_correcta, espuma_adecuada=espuma_adecuada,
-            vasos_correctos=vasos_correctos, recomendacion_activa=recomendacion_activa,
-            equipo_capacitado=equipo_capacitado, visible_en_carta=visible_en_carta,
-            descripcion_atractiva=descripcion_atractiva, destacada_campana=destacada_campana,
-            marca_bien_escrita=marca_bien_escrita, notas_ejecucion=notas_ejecucion,
-            material_pop_vigente=material_pop_vigente, material_limpio=material_limpio,
-            lineamiento_marca=lineamiento_marca, competencia_visual=competencia_visual,
-            posicion_correcta=posicion_correcta, transmite_calidad=transmite_calidad,
-            notas_branding=notas_branding,
-            staff_describe_variedades=staff_describe_variedades,
-            saben_mas_premiada=saben_mas_premiada, recomiendan_maridaje=recomiendan_maridaje,
-            hay_degustacion=hay_degustacion, incentivo_staff=incentivo_staff,
-            venta_cruzada=venta_cruzada, storytelling=storytelling,
-            menciona_chilena_premiada=menciona_chilena_premiada,
-            propuesta_maridaje=propuesta_maridaje, propuesta_cocteleria=propuesta_cocteleria,
-            notas_experiencia=notas_experiencia,
-            participacion_categoria=participacion_categoria,
-            precio_vs_competencia=precio_vs_competencia,
-            competidor_activando=competidor_activando, cambio_administrador=cambio_administrador,
-            notas_data=notas_data,
-            es_prospecto=es_prospecto, tipo_local=tipo_local,
-            ticket_promedio=ticket_promedio, perfil_publico=perfil_publico,
-            capacidad_pax=capacidad_pax, volumen_potencial=volumen_potencial,
-            tipo_cocina=tipo_cocina, enfoque_maridaje=enfoque_maridaje,
-            eventos_musica=eventos_musica, tiene_schop=tiene_schop,
-            num_lineas=num_lineas, marcas_conectadas=marcas_conectadas,
-            precio_competencia_schop=precio_competencia_schop,
-            espacio_nueva_linea=espacio_nueva_linea,
-            condiciones_comerciales=condiciones_comerciales,
-            notas_prospeccion=notas_prospeccion,
-            score_pct=score_pct,
-        )
-        save_visita(row)
-        st.success(f"✅ Visita a **{pdv}** guardada. Score: {score_pct}%")
+        save_visita(base, fotos)
+        if tipo_visita == "Auditoría":
+            st.session_state.variedades = []
+        st.success(f"✅ Visita **{tipo_visita}** en **{pdv}** guardada correctamente.")
         st.balloons()
 
+
+# ── HISTORIAL ─────────────────────────────────────────────────────────────────
 
 def pagina_historial():
     st.title("📋 Historial de Visitas")
     df = load_visitas()
 
     if df.empty:
-        st.info("Aún no hay visitas registradas. ¡Ve a Check List para registrar la primera!")
+        st.info("Sin visitas aún. ¡Registra la primera en Check List PDV!")
         return
 
     hoy = date.today()
     kpis = calc_kpis(df, hoy.month, hoy.year)
-
-    # KPI resumen
     st.subheader(f"KPIs — {hoy.strftime('%B %Y').capitalize()}")
     cols = st.columns(4)
     for i, (nombre, (meta, pond)) in enumerate(METAS.items()):
         actual = kpis.get(nombre, 0)
         pct = min(actual / meta, 1.0)
-        pct_cumpl = round(pct * 100)
-        band = ("100%" if pct_cumpl >= 100 else
-                "90-99%" if pct_cumpl >= 90 else
-                "85-89%" if pct_cumpl >= 85 else
-                "80-84%" if pct_cumpl >= 80 else
-                "75-79%" if pct_cumpl >= 75 else "<75%")
+        color = "🟢" if pct >= 1.0 else ("🟡" if pct >= 0.75 else "🔴")
         with cols[i]:
-            st.metric(nombre, f"{actual}/{meta}", delta=f"{pct_cumpl}%")
+            st.metric(nombre, f"{actual}/{meta}", delta=f"{int(pct*100)}%")
             st.progress(pct)
-            st.caption(f"Rango: {band}")
+            st.caption(f"{color} Pond. {int(pond*100)}%")
 
     st.markdown("---")
-
-    # Filtros
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        ambas = sorted(df["ambassador"].dropna().unique().tolist())
-        filtro_amb = st.multiselect("Filtrar por Ambassador", ambas)
-    with col2:
-        tipos = sorted(df["tipo_visita"].dropna().unique().tolist())
-        filtro_tipo = st.multiselect("Filtrar por Tipo de visita", tipos)
-    with col3:
-        if st.button("🗑️ Exportar a Excel", use_container_width=True):
-            excel_path = DATA_PATH.parent / "beer_ambassador_export.xlsx"
-            df.to_excel(excel_path, index=False)
-            st.success(f"Exportado: {excel_path}")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        tipos = sorted(df["tipo_visita"].dropna().unique()) if "tipo_visita" in df.columns else []
+        filtro_tipo = st.multiselect("Tipo de visita", tipos)
+    with c2:
+        ambs = sorted(df["ambassador"].dropna().unique()) if "ambassador" in df.columns else []
+        filtro_amb = st.multiselect("Ambassador", ambs)
+    with c3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("📥 Exportar a Excel", use_container_width=True):
+            p = DATA_PATH.parent / "beer_ambassador_export.xlsx"
+            df.to_excel(p, index=False)
+            st.success(f"Guardado en: {p}")
 
     df_show = df.copy()
-    if filtro_amb:
-        df_show = df_show[df_show["ambassador"].isin(filtro_amb)]
     if filtro_tipo:
         df_show = df_show[df_show["tipo_visita"].isin(filtro_tipo)]
+    if filtro_amb:
+        df_show = df_show[df_show["ambassador"].isin(filtro_amb)]
 
-    # Tabla simplificada
-    cols_tabla = ["fecha", "pdv", "tipo_visita", "ambassador", "score_pct",
-                  "notas_ejecucion", "notas_branding", "notas_experiencia"]
-    cols_tabla = [c for c in cols_tabla if c in df_show.columns]
     df_show["fecha"] = pd.to_datetime(df_show["fecha"], errors="coerce")
     df_show = df_show.sort_values("fecha", ascending=False)
-    st.dataframe(df_show[cols_tabla], use_container_width=True, hide_index=True)
 
-    st.caption(f"Total visitas: {len(df_show)}")
+    cols_base = ["fecha", "pdv", "tipo_visita", "ambassador"]
+    cols_show = [c for c in cols_base if c in df_show.columns]
+    st.dataframe(df_show[cols_show], use_container_width=True, hide_index=True)
+    st.caption(f"Total: {len(df_show)} visitas")
+
+    # Detalle individual
+    st.markdown("---")
+    st.subheader("🔍 Ver detalle de una visita")
+    if "pdv" in df_show.columns and len(df_show):
+        opciones = df_show.apply(lambda r: f"{r['fecha'].date() if pd.notna(r['fecha']) else '?'} | {r.get('pdv','?')} | {r.get('tipo_visita','?')}", axis=1).tolist()
+        sel = st.selectbox("Selecciona una visita", opciones, key="detalle_sel")
+        idx = opciones.index(sel)
+        row = df_show.iloc[idx]
+        st.json(row.dropna().to_dict())
+
+        # Mostrar fotos si existen
+        if "fotos_json" in row and pd.notna(row["fotos_json"]):
+            try:
+                fotos_dict = json.loads(row["fotos_json"])
+                for sec, rutas in fotos_dict.items():
+                    st.markdown(f"**📷 {sec}**")
+                    cols_img = st.columns(min(len(rutas), 4))
+                    for i, ruta in enumerate(rutas):
+                        if Path(ruta).exists():
+                            with cols_img[i % 4]:
+                                st.image(ruta, use_container_width=True)
+            except Exception:
+                pass
 
 
-# ── Navegación ────────────────────────────────────────────────────────────────
+# ── NAV ───────────────────────────────────────────────────────────────────────
+
+logo = Path(__file__).parent / "kross_logo.png.png"
 with st.sidebar:
-    st.image("kross_logo.png.png", use_container_width=True)
+    if logo.exists():
+        st.image(str(logo), use_container_width=True)
     st.markdown("## 🍺 Beer Ambassador")
     st.markdown("---")
     pagina = st.radio("Navegación", ["🏠 Dashboard", "✅ Check List PDV", "📋 Historial"])
