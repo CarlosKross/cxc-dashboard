@@ -137,8 +137,17 @@ def load_visitas() -> pd.DataFrame:
     if _usar_gsheets():
         try:
             ws = _get_worksheet()
-            data = ws.get_all_records()
-            return pd.DataFrame(data) if data else pd.DataFrame()
+            # get_all_values() evita el error de cabeceras duplicadas
+            data = ws.get_all_values()
+            if not data or len(data) < 2:
+                return pd.DataFrame()
+            headers = data[0]
+            rows    = data[1:]
+            # Filtrar filas completamente vacías
+            rows = [r for r in rows if any(c.strip() for c in r)]
+            if not rows:
+                return pd.DataFrame()
+            return pd.DataFrame(rows, columns=headers)
         except Exception as e:
             st.warning(f"⚠️ No se pudo leer Google Sheets: {e}")
     if DATA_PATH.exists():
@@ -170,8 +179,10 @@ def save_visita(row: dict, fotos: dict):
         # Modo cloud → guardar en Google Sheets
         try:
             ws = _get_worksheet()
-            # Crear cabecera si la hoja está vacía
-            if ws.row_count == 0 or not ws.get("A1"):
+            # Verificar si A1 tiene un encabezado válido (no es TRUE/FALSE ni vacío)
+            a1 = ws.acell("A1").value or ""
+            if a1.strip() in ("", "TRUE", "FALSE") :
+                ws.clear()
                 ws.append_row(list(row.keys()))
             ws.append_row(list(row.values()))
             # Invalidar caché para que load_visitas lea lo nuevo
