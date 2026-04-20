@@ -4,6 +4,8 @@ import json
 import shutil
 from datetime import date
 from pathlib import Path
+import gspread
+from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="Beer Ambassador · Kross", page_icon="🍺", layout="wide")
 
@@ -76,8 +78,12 @@ hr { margin: 1.5rem 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-DATA_PATH  = Path(__file__).parent / "data" / "beer_ambassador_visitas.csv"
-FOTOS_PATH = Path(__file__).parent / "data" / "fotos"
+DATA_PATH   = Path(__file__).parent / "data" / "beer_ambassador_visitas.csv"
+FOTOS_PATH  = Path(__file__).parent / "data" / "fotos"
+SHEET_ID    = "1OrV3TVFvR52VQrmqWOGxqRk9lbtYNWdTbxS34Gn_AGU"
+SHEET_NAME  = "Visitas"
+SCOPES      = ["https://spreadsheets.google.com/feeds",
+               "https://www.googleapis.com/auth/drive"]
 
 DIAS = {
     0: ("Lunes",     "📋 Planificación", "Reunión comercial + contacto y filtro de prospectos"),
@@ -101,33 +107,77 @@ VARIEDADES_KROSS = [
     "Pale Ale", "Red Ale", "Pilsner", "Porter", "Otra",
 ]
 
+# ── Google Sheets ─────────────────────────────────────────────────────────────
+
+def _usar_gsheets():
+    """True si hay credenciales de Google en los Secrets de Streamlit."""
+    try:
+        return "gcp_service_account" in st.secrets
+    except Exception:
+        return False
+
+
+@st.cache_resource(ttl=60)
+def _get_worksheet():
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"], scopes=SCOPES
+    )
+    gc = gspread.authorize(creds)
+    sh = gc.open_by_key(SHEET_ID)
+    try:
+        ws = sh.worksheet(SHEET_NAME)
+    except gspread.WorksheetNotFound:
+        ws = sh.add_worksheet(title=SHEET_NAME, rows=5000, cols=80)
+    return ws
+
+
 # ── Helpers de datos ──────────────────────────────────────────────────────────
 
-def load_visitas():
+def load_visitas() -> pd.DataFrame:
+    if _usar_gsheets():
+        try:
+            ws = _get_worksheet()
+            data = ws.get_all_records()
+            return pd.DataFrame(data) if data else pd.DataFrame()
+        except Exception as e:
+            st.warning(f"⚠️ No se pudo leer Google Sheets: {e}")
     if DATA_PATH.exists():
         return pd.read_csv(DATA_PATH)
     return pd.DataFrame()
 
 
 def save_visita(row: dict, fotos: dict):
-    DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    # Guardar fotos
-    slug = f"{row['fecha']}_{row['pdv'].replace(' ', '_')[:20]}"
-    fotos_paths = {}
-    for seccion, archivos in fotos.items():
-        if archivos:
-            carpeta = FOTOS_PATH / slug / seccion
-            carpeta.mkdir(parents=True, exist_ok=True)
-            rutas = []
-            for f in archivos:
-                dest = carpeta / f.name
-                dest.write_bytes(f.getbuffer())
-                rutas.append(str(dest))
-            fotos_paths[seccion] = rutas
-    row["fotos_json"] = json.dumps(fotos_paths, ensure_ascii=False)
-    df = load_visitas()
-    df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-    df.to_csv(DATA_PATH, index=False)
+    # Fotos → solo en modo local (en cloud se omiten)
+    if not _usar_gsheets():
+        DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        slug = f"{row['fecha']}_{row['pdv'].replace(' ', '_')[:20]}"
+        fotos_paths = {}
+        for seccion, archivos in fotos.items():
+            if archivos:
+                carpeta = FOTOS_PATH / slug / seccion
+                carpeta.mkdir(parents=True, exist_ok=True)
+                rutas = []
+                for f in archivos:
+                    dest = carpeta / f.name
+                    dest.write_bytes(f.getbuffer())
+                    rutas.append(str(dest))
+                fotos_paths[seccion] = rutas
+        row["fotos_json"] = json.dumps(fotos_paths, ensure_ascii=False)
+        df = load_visitas()
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+        df.to_csv(DATA_PATH, index=False)
+    else:
+        # Modo cloud → guardar en Google Sheets
+        try:
+            ws = _get_worksheet()
+            # Crear cabecera si la hoja está vacía
+            if ws.row_count == 0 or not ws.get("A1"):
+                ws.append_row(list(row.keys()))
+            ws.append_row(list(row.values()))
+            # Invalidar caché para que load_visitas lea lo nuevo
+            _get_worksheet.clear()
+        except Exception as e:
+            st.error(f"❌ Error al guardar en Google Sheets: {e}")
 
 
 def calc_kpis(df, mes, anio):
