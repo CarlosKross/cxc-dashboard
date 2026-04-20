@@ -7,6 +7,75 @@ from pathlib import Path
 
 st.set_page_config(page_title="Beer Ambassador · Kross", page_icon="🍺", layout="wide")
 
+# ── CSS Responsivo ─────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+/* ── Fuente base más grande para móvil ── */
+html, body, [class*="css"] { font-size: 16px; }
+
+/* ── Sidebar compacto ── */
+[data-testid="stSidebar"] { min-width: 220px !important; }
+
+/* ── Inputs y botones táctiles ── */
+input, textarea, select,
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea {
+    font-size: 16px !important;   /* evita zoom en iOS */
+    min-height: 44px;
+    border-radius: 8px !important;
+}
+
+/* ── Checkboxes más grandes ── */
+[data-testid="stCheckbox"] > label {
+    font-size: 15px !important;
+    padding: 8px 4px;
+    cursor: pointer;
+}
+[data-testid="stCheckbox"] input[type="checkbox"] {
+    width: 20px; height: 20px;
+}
+
+/* ── Botón principal prominente ── */
+[data-testid="stButton"] > button[kind="primary"] {
+    height: 52px;
+    font-size: 17px !important;
+    font-weight: 700;
+    border-radius: 10px !important;
+    width: 100%;
+}
+
+/* ── Sliders táctiles ── */
+[data-testid="stSlider"] > div > div > div { height: 8px; }
+[data-testid="stSlider"] [role="slider"]   { width: 28px !important; height: 28px !important; }
+
+/* ── Métricas legibles ── */
+[data-testid="stMetricValue"] { font-size: 28px !important; }
+
+/* ── En pantallas pequeñas: columnas en una sola fila vertical ── */
+@media (max-width: 768px) {
+    [data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+    /* Sidebar colapsado por defecto en móvil (comportamiento nativo Streamlit) */
+    section[data-testid="stSidebar"] { width: 0 !important; }
+    /* Secciones más separadas */
+    .block-container { padding: 1rem 0.75rem !important; }
+}
+
+/* ── Separadores de sección ── */
+hr { margin: 1.5rem 0 !important; }
+
+/* ── File uploader área más grande ── */
+[data-testid="stFileUploader"] {
+    border: 2px dashed #e0a800 !important;
+    border-radius: 10px !important;
+    padding: 12px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 DATA_PATH  = Path(__file__).parent / "data" / "beer_ambassador_visitas.csv"
 FOTOS_PATH = Path(__file__).parent / "data" / "fotos"
 
