@@ -192,8 +192,9 @@ def save_visita(row: dict, fotos: dict):
 
 
 def calc_kpis(df, mes, anio):
-    if df.empty:
-        return {k: 0 for k in METAS}
+    ceros = {k: 0 for k in METAS}
+    if df.empty or "fecha" not in df.columns:
+        return ceros
     df = df.copy()
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     m = (df["fecha"].dt.month == mes) & (df["fecha"].dt.year == anio)
