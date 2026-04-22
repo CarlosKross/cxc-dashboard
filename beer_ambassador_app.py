@@ -690,15 +690,12 @@ def pagina_checklist():
         tipo_visita = st.selectbox("Tipo de visita *",
                                    ["Auditoría", "Capacitación", "Activación", "Prospección"])
 
-    c3, c4 = st.columns(2)
-    with c3:
-        ambassador = st.text_input("Beer Ambassador *", placeholder="Tu nombre completo")
-    with c4:
-        if crm:
-            ejecutivos = sorted(crm["by_ejecutivo"].keys())
-            ejecutivo = st.selectbox("Ejecutivo de la cuenta *", ["— Selecciona —"] + ejecutivos)
-        else:
-            ejecutivo = st.text_input("Ejecutivo de la cuenta", placeholder="Nombre del ejecutivo")
+    ambassador = "Francisco Rodriguez"
+    if crm:
+        ejecutivos = sorted(crm["by_ejecutivo"].keys())
+        ejecutivo = st.selectbox("Ejecutivo de la cuenta *", ["— Selecciona —"] + ejecutivos)
+    else:
+        ejecutivo = st.text_input("Ejecutivo de la cuenta", placeholder="Nombre del ejecutivo")
 
     # ── Selector PDV filtrado por ejecutivo ───────────────────────
     if crm and ejecutivo and ejecutivo != "— Selecciona —":
