@@ -80,10 +80,20 @@ hr { margin: 1.5rem 0 !important; }
 
 DATA_PATH   = Path(__file__).parent / "data" / "beer_ambassador_visitas.csv"
 FOTOS_PATH  = Path(__file__).parent / "data" / "fotos"
+CRM_PATH    = Path(__file__).parent / "data" / "CRM_Comercial.xlsx"
 SHEET_ID    = "1OrV3TVFvR52VQrmqWOGxqRk9lbtYNWdTbxS34Gn_AGU"
 SHEET_NAME  = "Visitas"
 SCOPES      = ["https://spreadsheets.google.com/feeds",
                "https://www.googleapis.com/auth/drive"]
+
+EJECUTIVOS_VALIDOS = [
+    "Armiro Perez", "Carlos Echeverria", "Carol Ibaceta",
+    "Francisco Carreño", "Gerson Astudillo",
+]
+VARIEDADES_BASE = [
+    "Golden", "Pils", "Maibock", "Stout", "K5",
+    "Hoppy", "Berries", "Hazy Lager", "Ipa", "Ipa Pomelo",
+]
 
 DIAS = {
     0: ("Lunes",     "📋 Planificación", "Reunión comercial + contacto y filtro de prospectos"),
@@ -106,6 +116,96 @@ VARIEDADES_KROSS = [
     "Golden Ale", "Maibock", "Stout", "IPA", "Weizen",
     "Pale Ale", "Red Ale", "Pilsner", "Porter", "Otra",
 ]
+
+# ── CRM Comercial ─────────────────────────────────────────────────────────────
+
+@st.cache_data(ttl=3600, show_spinner="Cargando CRM...")
+def load_crm(file_bytes: bytes = None):
+    """Carga clientes, variedades y volúmenes desde el CRM Comercial."""
+    try:
+        import io
+        src = io.BytesIO(file_bytes) if file_bytes else (CRM_PATH if CRM_PATH.exists() else None)
+        if src is None:
+            return None
+        xl = pd.ExcelFile(src)
+
+        # ── Base Maestra ─────────────────────────────────────────
+        df = xl.parse("Base Maestra", skiprows=1, header=0)
+        col_nombre = [c for c in df.columns if "Fantas" in str(c)][0]
+        col_ejec   = [c for c in df.columns if "Ejecutivo" in str(c)][0]
+        col_activo = [c for c in df.columns if "Activos" in str(c)][0]
+        col_cat    = [c for c in df.columns if "Categor" in str(c)][0]
+
+        df = df[df[col_activo] == "Si"]
+        df = df[df[col_ejec].isin(EJECUTIVOS_VALIDOS)]
+
+        clientes = {}
+        for _, row in df.iterrows():
+            nombre = str(row.get(col_nombre, "")).strip()
+            if not nombre or nombre == "nan":
+                continue
+            vars_c = [v for v in VARIEDADES_BASE
+                      if str(row.get(v, "")).strip().upper() in ("TRUE", "1", "SI")]
+            clientes[nombre] = {
+                "ejecutivo": str(row.get(col_ejec, "")).strip(),
+                "variedades": vars_c,
+                "comuna":     str(row.get("Comuna", "")).strip(),
+                "categoria":  str(row.get(col_cat, "")).strip(),
+                "volumenes":  {},
+            }
+
+        # ── Base Ventas ───────────────────────────────────────────
+        df_v = xl.parse("Base Ventas")
+        col_desc = [c for c in df_v.columns if "Descripci" in str(c)][0]
+        col_dest = [c for c in df_v.columns if "Destino" in str(c)][0]
+        df_v["variedad"]       = df_v[col_desc].str.extract(r"KROSS\s+([\w\s]+?)\s+\d+")
+        df_v["cliente_nombre"] = df_v[col_dest].str.split(" ; ").str[0].str.strip()
+        vol = df_v.groupby(["cliente_nombre", "variedad"])["Litros"].sum().reset_index()
+
+        for _, row in vol.iterrows():
+            nombre = str(row["cliente_nombre"]).strip()
+            if nombre in clientes and pd.notna(row["variedad"]):
+                clientes[nombre]["volumenes"][str(row["variedad"]).strip()] = round(float(row["Litros"]), 1)
+
+        # ── Agrupado por ejecutivo ────────────────────────────────
+        by_ej = {}
+        for nombre, data in clientes.items():
+            ej = data["ejecutivo"]
+            by_ej.setdefault(ej, [])
+            by_ej[ej].append(nombre)
+        for ej in by_ej:
+            by_ej[ej] = sorted(by_ej[ej])
+
+        return {"clientes": clientes, "by_ejecutivo": by_ej}
+    except Exception as e:
+        st.warning(f"⚠️ Error cargando CRM: {e}")
+        return None
+
+
+def panel_cliente_crm(crm, pdv):
+    """Muestra tarjeta con info del cliente seleccionado del CRM."""
+    if not crm or not pdv:
+        return
+    info = crm["clientes"].get(pdv, {})
+    if not info:
+        return
+    with st.container():
+        st.markdown("---")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(f"**🏪 Categoría:** {info.get('categoria','—')}")
+            st.markdown(f"**📍 Comuna:** {info.get('comuna','—')}")
+        with c2:
+            vars_txt = ", ".join(info.get("variedades", [])) or "Sin registro"
+            st.markdown(f"**🍺 Variedades contratadas:** {vars_txt}")
+        with c3:
+            vols = info.get("volumenes", {})
+            if vols:
+                top = sorted(vols.items(), key=lambda x: x[1], reverse=True)[:5]
+                vol_txt = " | ".join(f"{v}: **{l:.0f}L**" for v, l in top)
+                st.markdown(f"**📦 Volúmenes históricos:** {vol_txt}")
+        st.markdown("---")
+
 
 # ── Google Sheets ─────────────────────────────────────────────────────────────
 
@@ -574,22 +674,68 @@ def form_prospeccion(base, fotos):
 def pagina_checklist():
     st.title("✅ Check List de Visita PDV")
 
-    # Cabecera común
-    c1, c2, c3, c4 = st.columns(4)
+    # ── Cargar CRM ────────────────────────────────────────────────
+    crm = load_crm()
+    if crm is None:
+        st.warning("⚠️ CRM no encontrado localmente. Sube el archivo para habilitar el selector de clientes.")
+        crm_file = st.file_uploader("📂 Cargar CRM Comercial (.xlsx)", type=["xlsx"], key="crm_upload")
+        if crm_file:
+            crm = load_crm(file_bytes=crm_file.read())
+
+    # ── Cabecera ──────────────────────────────────────────────────
+    c1, c2 = st.columns(2)
     with c1:
         fecha = st.date_input("Fecha", value=date.today())
     with c2:
-        pdv = st.text_input("Nombre del PDV *", placeholder="Ej: Bar La Canela")
-    with c3:
         tipo_visita = st.selectbox("Tipo de visita *",
                                    ["Auditoría", "Capacitación", "Activación", "Prospección"])
+
+    c3, c4 = st.columns(2)
+    with c3:
+        ambassador = st.text_input("Beer Ambassador *", placeholder="Tu nombre completo")
     with c4:
-        ambassador = st.text_input("Beer Ambassador", placeholder="Tu nombre")
+        if crm:
+            ejecutivos = sorted(crm["by_ejecutivo"].keys())
+            ejecutivo = st.selectbox("Ejecutivo de la cuenta *", ["— Selecciona —"] + ejecutivos)
+        else:
+            ejecutivo = st.text_input("Ejecutivo de la cuenta", placeholder="Nombre del ejecutivo")
 
+    # ── Selector PDV filtrado por ejecutivo ───────────────────────
+    if crm and ejecutivo and ejecutivo != "— Selecciona —":
+        clientes_ej = crm["by_ejecutivo"].get(ejecutivo, [])
+        if tipo_visita == "Prospección":
+            pdv = st.text_input("Nombre del Prospecto *", placeholder="Nombre del local nuevo")
+        else:
+            pdv_sel = st.selectbox(
+                f"📋 Cartera de {ejecutivo} ({len(clientes_ej)} clientes activos)",
+                ["— Selecciona cliente —"] + clientes_ej,
+            )
+            pdv = pdv_sel if pdv_sel != "— Selecciona cliente —" else ""
+            # Tarjeta informativa del cliente
+            if pdv:
+                panel_cliente_crm(crm, pdv)
+    else:
+        pdv = st.text_input("Nombre del PDV *", placeholder="Ej: Bar La Canela")
+
+    # Guardar también ejecutivo en base
     st.markdown("---")
-
-    base  = {"fecha": str(fecha), "pdv": pdv, "tipo_visita": tipo_visita, "ambassador": ambassador}
+    base  = {
+        "fecha": str(fecha), "pdv": pdv, "tipo_visita": tipo_visita,
+        "ambassador": ambassador, "ejecutivo": ejecutivo,
+    }
     fotos = {}
+
+    # Pre-cargar variedades del cliente en session_state para Auditoría
+    if (crm and pdv and tipo_visita == "Auditoría"
+            and "variedades" not in st.session_state):
+        info = crm["clientes"].get(pdv, {})
+        vars_crm = info.get("variedades", [])
+        if vars_crm:
+            st.session_state.variedades = [
+                {"nombre": v, "temp": 3, "espuma": 3, "sabor": 3,
+                 "vaso_correcto": True, "obs": ""}
+                for v in vars_crm
+            ]
 
     if tipo_visita == "Auditoría":
         form_auditoria(base, fotos)
