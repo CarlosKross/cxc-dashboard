@@ -83,6 +83,7 @@ FOTOS_PATH  = Path(__file__).parent / "data" / "fotos"
 CRM_PATH    = Path(__file__).parent / "data" / "CRM_Comercial.xlsx"
 SHEET_ID    = "1OrV3TVFvR52VQrmqWOGxqRk9lbtYNWdTbxS34Gn_AGU"
 SHEET_NAME  = "Visitas"
+CRM_SHEET_ID = "1IvZCIHk_kHkqLrHhrsfTxfTkRC9gVelk9lNgpYbFPZI"
 SCOPES      = ["https://spreadsheets.google.com/feeds",
                "https://www.googleapis.com/auth/drive"]
 
@@ -119,66 +120,154 @@ VARIEDADES_KROSS = [
 
 # ── CRM Comercial ─────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner="Cargando CRM...")
+def _procesar_crm(df_maestra, df_ventas):
+    """Transforma DataFrames de Base Maestra + Base Ventas en estructura CRM."""
+    import re
+    from datetime import date as _date
+    hoy = _date.today()
+
+    # ── Base Maestra ──────────────────────────────────────────────────────────
+    df = df_maestra.copy()
+    for col in df.columns:
+        df[col] = df[col].astype(str).str.strip()
+
+    col_nombre = next((c for c in df.columns if "Fantas" in c), None)
+    col_ejec   = next((c for c in df.columns if "Ejecutivo" in c), None)
+    col_activo = next((c for c in df.columns if "Activos" in c), None)
+    col_cat    = next((c for c in df.columns if "Categor" in c), None)
+    if not all([col_nombre, col_ejec, col_activo]):
+        return None
+
+    df = df[df[col_activo].str.lower().isin(["si", "sí"])]
+    df = df[df[col_ejec].isin(EJECUTIVOS_VALIDOS)]
+
+    clientes = {}
+    for _, row in df.iterrows():
+        nombre = row[col_nombre]
+        if not nombre or nombre == "nan":
+            continue
+        vars_c = [v for v in VARIEDADES_BASE
+                  if row.get(v, "").upper() in ("TRUE", "1", "SI", "SÍ")]
+        clientes[nombre] = {
+            "ejecutivo":  row[col_ejec],
+            "variedades": vars_c,
+            "comuna":     row.get("Comuna", ""),
+            "categoria":  row.get(col_cat, "") if col_cat else "",
+            "volumenes":  {},
+            "ventas_mes": {},
+        }
+
+    # ── Base Ventas ───────────────────────────────────────────────────────────
+    df_v = df_ventas.copy()
+    for col in df_v.select_dtypes(include="object").columns:
+        df_v[col] = df_v[col].astype(str).str.strip()
+
+    col_desc   = next((c for c in df_v.columns if "Descrip" in c), None)
+    col_dest   = next((c for c in df_v.columns if "Destino" in c), None)
+    col_litros = next((c for c in df_v.columns if "Litro" in c), None)
+    col_mes    = next((c for c in df_v.columns if c.strip().lower() == "mes"), None)
+    col_anio   = next((c for c in df_v.columns
+                       if c.strip().lower() in ("año", "ano", "year")
+                       or (c.strip().lower().startswith("a") and c.strip().lower().endswith("o") and len(c.strip()) <= 5)), None)
+
+    if col_desc and col_dest and col_litros:
+        df_v["variedad"]  = df_v[col_desc].str.extract(r"KROSS\s+([\w\s]+?)\s+\d+", flags=re.IGNORECASE)
+        df_v["cliente_n"] = df_v[col_dest].str.split(" ; ").str[0].str.strip()
+        # Litros: formato chileno usa "." como miles → quitar antes de parsear
+        df_v["_litros"] = pd.to_numeric(
+            df_v[col_litros].str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+            errors="coerce"
+        ).fillna(0)
+
+        # Historial completo
+        vol = df_v.groupby(["cliente_n", "variedad"])["_litros"].sum().reset_index()
+        for _, r in vol.iterrows():
+            n = r["cliente_n"]
+            if n in clientes and pd.notna(r["variedad"]) and r["variedad"] not in ("nan", ""):
+                clientes[n]["volumenes"][r["variedad"].strip()] = round(r["_litros"], 1)
+
+        # Ventas del mes en curso
+        if col_mes and col_anio:
+            df_mes = df_v[
+                (df_v[col_mes].str.strip() == str(hoy.month)) &
+                (df_v[col_anio].str.strip() == str(hoy.year))
+            ]
+        else:
+            col_fecha = next((c for c in df_v.columns if c.lower() == "fecha"), None)
+            df_v["_fecha"] = pd.to_datetime(df_v[col_fecha], dayfirst=True, errors="coerce") if col_fecha else pd.NaT
+            df_mes = df_v[(df_v["_fecha"].dt.month == hoy.month) & (df_v["_fecha"].dt.year == hoy.year)]
+
+        if not df_mes.empty:
+            vol_mes = df_mes.groupby(["cliente_n", "variedad"])["_litros"].sum().reset_index()
+            for _, r in vol_mes.iterrows():
+                n = r["cliente_n"]
+                if n in clientes and pd.notna(r["variedad"]) and r["variedad"] not in ("nan", ""):
+                    clientes[n]["ventas_mes"][r["variedad"].strip()] = round(r["_litros"], 1)
+
+    # ── Agrupar por ejecutivo ─────────────────────────────────────────────────
+    by_ej = {}
+    for nombre, data in clientes.items():
+        ej = data["ejecutivo"]
+        by_ej.setdefault(ej, []).append(nombre)
+    for ej in by_ej:
+        by_ej[ej] = sorted(by_ej[ej])
+
+    return {"clientes": clientes, "by_ejecutivo": by_ej}
+
+
+@st.cache_data(ttl=1800, show_spinner="Cargando CRM...")
 def load_crm(file_bytes: bytes = None):
-    """Carga clientes, variedades y volúmenes desde el CRM Comercial."""
+    """CRM desde Google Sheets (cloud), archivo subido, o Excel local."""
     try:
         import io
-        src = io.BytesIO(file_bytes) if file_bytes else (CRM_PATH if CRM_PATH.exists() else None)
-        if src is None:
-            return None
-        xl = pd.ExcelFile(src)
-
-        # ── Base Maestra ─────────────────────────────────────────
-        df = xl.parse("Base Maestra", skiprows=1, header=0)
-        col_nombre = [c for c in df.columns if "Fantas" in str(c)][0]
-        col_ejec   = [c for c in df.columns if "Ejecutivo" in str(c)][0]
-        col_activo = [c for c in df.columns if "Activos" in str(c)][0]
-        col_cat    = [c for c in df.columns if "Categor" in str(c)][0]
-
-        df = df[df[col_activo] == "Si"]
-        df = df[df[col_ejec].isin(EJECUTIVOS_VALIDOS)]
-
-        clientes = {}
-        for _, row in df.iterrows():
-            nombre = str(row.get(col_nombre, "")).strip()
-            if not nombre or nombre == "nan":
-                continue
-            vars_c = [v for v in VARIEDADES_BASE
-                      if str(row.get(v, "")).strip().upper() in ("TRUE", "1", "SI")]
-            clientes[nombre] = {
-                "ejecutivo": str(row.get(col_ejec, "")).strip(),
-                "variedades": vars_c,
-                "comuna":     str(row.get("Comuna", "")).strip(),
-                "categoria":  str(row.get(col_cat, "")).strip(),
-                "volumenes":  {},
-            }
-
-        # ── Base Ventas ───────────────────────────────────────────
-        df_v = xl.parse("Base Ventas")
-        col_desc = [c for c in df_v.columns if "Descripci" in str(c)][0]
-        col_dest = [c for c in df_v.columns if "Destino" in str(c)][0]
-        df_v["variedad"]       = df_v[col_desc].str.extract(r"KROSS\s+([\w\s]+?)\s+\d+")
-        df_v["cliente_nombre"] = df_v[col_dest].str.split(" ; ").str[0].str.strip()
-        vol = df_v.groupby(["cliente_nombre", "variedad"])["Litros"].sum().reset_index()
-
-        for _, row in vol.iterrows():
-            nombre = str(row["cliente_nombre"]).strip()
-            if nombre in clientes and pd.notna(row["variedad"]):
-                clientes[nombre]["volumenes"][str(row["variedad"]).strip()] = round(float(row["Litros"]), 1)
-
-        # ── Agrupado por ejecutivo ────────────────────────────────
-        by_ej = {}
-        for nombre, data in clientes.items():
-            ej = data["ejecutivo"]
-            by_ej.setdefault(ej, [])
-            by_ej[ej].append(nombre)
-        for ej in by_ej:
-            by_ej[ej] = sorted(by_ej[ej])
-
-        return {"clientes": clientes, "by_ejecutivo": by_ej}
+        if file_bytes:
+            xl = pd.ExcelFile(io.BytesIO(file_bytes))
+            return _procesar_crm(
+                xl.parse("Base Maestra", skiprows=1, header=0),
+                xl.parse("Base Ventas 26"),
+            )
+        if _usar_gsheets():
+            return _load_crm_gsheets()
+        if CRM_PATH.exists():
+            xl = pd.ExcelFile(CRM_PATH)
+            return _procesar_crm(
+                xl.parse("Base Maestra", skiprows=1, header=0),
+                xl.parse("Base Ventas 26"),
+            )
+        return None
     except Exception as e:
         st.warning(f"⚠️ Error cargando CRM: {e}")
+        return None
+
+
+@st.cache_data(ttl=1800, show_spinner="Cargando CRM desde Google Sheets...")
+def _load_crm_gsheets():
+    """Lee Base Maestra + Base Ventas 26 directamente desde el CRM en Google Sheets."""
+    try:
+        creds = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"], scopes=SCOPES
+        )
+        gc  = gspread.authorize(creds)
+        sh  = gc.open_by_key(CRM_SHEET_ID)
+
+        # Base Maestra: fila 0 = subtotales, fila 1 = encabezados, fila 2+ = datos
+        raw_m = sh.worksheet("Base Maestra").get_all_values()
+        if len(raw_m) < 3:
+            return None
+        df_maestra = pd.DataFrame(raw_m[2:], columns=raw_m[1])
+
+        # Base Ventas 26: fila 0 = encabezados, fila 1+ = datos
+        raw_v = sh.worksheet("Base Ventas 26").get_all_values()
+        if len(raw_v) < 2:
+            return None
+        df_ventas = pd.DataFrame(raw_v[1:], columns=raw_v[0])
+
+        return _procesar_crm(df_maestra, df_ventas)
+    except gspread.SpreadsheetNotFound:
+        st.error("❌ CRM no accesible. Comparte la hoja con: beer-ambassador-bot@beer-ambassador.iam.gserviceaccount.com")
+        return None
+    except Exception as e:
+        st.warning(f"⚠️ Error leyendo CRM: {e}")
         return None
 
 
@@ -189,21 +278,34 @@ def panel_cliente_crm(crm, pdv):
     info = crm["clientes"].get(pdv, {})
     if not info:
         return
+
+    from datetime import date as _date
+    mes_txt = _date.today().strftime("%B %Y").capitalize()
+
     with st.container():
         st.markdown("---")
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown(f"**🏪 Categoría:** {info.get('categoria','—')}")
             st.markdown(f"**📍 Comuna:** {info.get('comuna','—')}")
-        with c2:
             vars_txt = ", ".join(info.get("variedades", [])) or "Sin registro"
-            st.markdown(f"**🍺 Variedades contratadas:** {vars_txt}")
+            st.markdown(f"**🍺 Variedades:** {vars_txt}")
+        with c2:
+            ventas_mes = info.get("ventas_mes", {})
+            total_mes  = sum(ventas_mes.values())
+            st.markdown(f"**📅 Ventas {mes_txt}**")
+            if ventas_mes:
+                st.metric("Total mes", f"{total_mes:.0f} L")
+                for var, lts in sorted(ventas_mes.items(), key=lambda x: -x[1]):
+                    st.caption(f"• {var}: {lts:.0f} L")
+            else:
+                st.caption("Sin ventas registradas este mes")
         with c3:
             vols = info.get("volumenes", {})
             if vols:
-                top = sorted(vols.items(), key=lambda x: x[1], reverse=True)[:5]
-                vol_txt = " | ".join(f"{v}: **{l:.0f}L**" for v, l in top)
-                st.markdown(f"**📦 Volúmenes históricos:** {vol_txt}")
+                st.markdown("**📦 Histórico top 5**")
+                for var, lts in sorted(vols.items(), key=lambda x: -x[1])[:5]:
+                    st.caption(f"• {var}: {lts:.0f} L")
         st.markdown("---")
 
 
@@ -676,11 +778,13 @@ def pagina_checklist():
 
     # ── Cargar CRM ────────────────────────────────────────────────
     crm = load_crm()
-    if crm is None:
+    if crm is None and not _usar_gsheets():
         st.warning("⚠️ CRM no encontrado localmente. Sube el archivo para habilitar el selector de clientes.")
         crm_file = st.file_uploader("📂 Cargar CRM Comercial (.xlsx)", type=["xlsx"], key="crm_upload")
         if crm_file:
             crm = load_crm(file_bytes=crm_file.read())
+    elif crm is None and _usar_gsheets():
+        st.error("❌ No se pudo cargar el CRM desde Google Sheets. Verifica que la hoja esté compartida con la cuenta de servicio.")
 
     # ── Cabecera ──────────────────────────────────────────────────
     c1, c2 = st.columns(2)
