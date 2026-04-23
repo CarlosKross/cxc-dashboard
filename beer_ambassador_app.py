@@ -113,10 +113,6 @@ METAS = {
     "Auditorías Calidad":     (20, 0.20),
 }
 
-VARIEDADES_KROSS = [
-    "Golden Ale", "Maibock", "Stout", "IPA", "Weizen",
-    "Pale Ale", "Red Ale", "Pilsner", "Porter", "Otra",
-]
 
 # ── CRM Comercial ─────────────────────────────────────────────────────────────
 
@@ -519,7 +515,7 @@ def form_auditoria(base, fotos):
 
     col_add, col_clear = st.columns([2, 1])
     with col_add:
-        nueva = st.selectbox("Seleccionar variedad conectada", [""] + VARIEDADES_KROSS, key="nueva_variedad")
+        nueva = st.selectbox("Seleccionar variedad conectada", [""] + VARIEDADES_BASE + ["Otra"], key="nueva_variedad")
     with col_clear:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("➕ Agregar variedad", use_container_width=True):
@@ -687,7 +683,7 @@ def form_activacion(base, fotos):
 
     st.markdown("---")
     seccion_header("2. Variedades Activadas", "🍺")
-    vars_act = st.multiselect("Variedades que se sirvieron / destacaron", VARIEDADES_KROSS, key="vars_act")
+    vars_act = st.multiselect("Variedades que se sirvieron / destacaron", VARIEDADES_BASE + ["Otra"], key="vars_act")
     base["variedades_activadas"] = ", ".join(vars_act)
     base["material_pop_usado"]   = st.checkbox("¿Se usó material POP de Kross?", key="mpu")
     base["incentivo_staff"]      = st.checkbox("¿Hubo incentivo al staff?", key="is_act")
@@ -791,34 +787,53 @@ def pagina_checklist():
     with c1:
         fecha = st.date_input("Fecha", value=date.today())
     with c2:
-        tipo_visita = st.selectbox("Tipo de visita *",
-                                   ["Auditoría", "Capacitación", "Activación", "Prospección"])
+        tipo_visita = st.selectbox(
+            "Tipo de visita *",
+            ["Auditoría", "Capacitación", "Activación", "Prospección"],
+            key="tipo_visita_sel",
+        )
 
     ambassador = "Francisco Rodriguez"
     if crm:
         ejecutivos = sorted(crm["by_ejecutivo"].keys())
-        ejecutivo = st.selectbox("Ejecutivo de la cuenta *", ["— Selecciona —"] + ejecutivos)
+        ejecutivo = st.selectbox("Ejecutivo de la cuenta *",
+                                 ["— Selecciona —"] + ejecutivos,
+                                 key="ejecutivo_sel")
     else:
-        ejecutivo = st.text_input("Ejecutivo de la cuenta", placeholder="Nombre del ejecutivo")
+        ejecutivo = st.text_input("Ejecutivo de la cuenta",
+                                  placeholder="Nombre del ejecutivo",
+                                  key="ejecutivo_txt")
 
     # ── Selector PDV filtrado por ejecutivo ───────────────────────
     if crm and ejecutivo and ejecutivo != "— Selecciona —":
         clientes_ej = crm["by_ejecutivo"].get(ejecutivo, [])
         if tipo_visita == "Prospección":
-            pdv = st.text_input("Nombre del Prospecto *", placeholder="Nombre del local nuevo")
+            pdv = st.text_input("Nombre del Prospecto *",
+                                 placeholder="Nombre del local nuevo",
+                                 key="pdv_prospecto")
         else:
             pdv_sel = st.selectbox(
                 f"📋 Cartera de {ejecutivo} ({len(clientes_ej)} clientes activos)",
                 ["— Selecciona cliente —"] + clientes_ej,
+                key=f"pdv_sel_{ejecutivo}",   # cambia key al cambiar ejecutivo → reset automático
             )
             pdv = pdv_sel if pdv_sel != "— Selecciona cliente —" else ""
-            # Tarjeta informativa del cliente
             if pdv:
                 panel_cliente_crm(crm, pdv)
     else:
-        pdv = st.text_input("Nombre del PDV *", placeholder="Ej: Bar La Canela")
+        pdv = st.text_input("Nombre del PDV *",
+                             placeholder="Ej: Bar La Canela",
+                             key="pdv_libre")
 
-    # Guardar también ejecutivo en base
+    # ── Reset de formulario al cambiar tipo de visita o cliente ───
+    _sig = f"{tipo_visita}||{pdv}"
+    if st.session_state.get("_form_sig") != _sig:
+        st.session_state["_form_sig"] = _sig
+        # Limpiar estado del formulario de auditoría (variedades en barra)
+        st.session_state.pop("variedades", None)
+        st.session_state.pop("nueva_variedad", None)
+        st.rerun()
+
     st.markdown("---")
     base  = {
         "fecha": str(fecha), "pdv": pdv, "tipo_visita": tipo_visita,
@@ -826,7 +841,7 @@ def pagina_checklist():
     }
     fotos = {}
 
-    # Pre-cargar variedades del cliente en session_state para Auditoría
+    # Pre-cargar variedades contratadas del cliente para Auditoría
     if (crm and pdv and tipo_visita == "Auditoría"
             and "variedades" not in st.session_state):
         info = crm["clientes"].get(pdv, {})
