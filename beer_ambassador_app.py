@@ -929,15 +929,16 @@ def pagina_historial():
             st.success(f"Guardado en: {p}")
 
     df_show = df.copy()
-    if filtro_tipo:
+    if filtro_tipo and "tipo_visita" in df_show.columns:
         df_show = df_show[df_show["tipo_visita"].isin(filtro_tipo)]
-    if filtro_amb:
+    if filtro_amb and "ambassador" in df_show.columns:
         df_show = df_show[df_show["ambassador"].isin(filtro_amb)]
 
-    df_show["fecha"] = pd.to_datetime(df_show["fecha"], errors="coerce")
-    df_show = df_show.sort_values("fecha", ascending=False)
+    if "fecha" in df_show.columns:
+        df_show["fecha"] = pd.to_datetime(df_show["fecha"], errors="coerce")
+        df_show = df_show.sort_values("fecha", ascending=False)
 
-    cols_base = ["fecha", "pdv", "tipo_visita", "ambassador"]
+    cols_base = ["fecha", "pdv", "ejecutivo", "tipo_visita", "ambassador"]
     cols_show = [c for c in cols_base if c in df_show.columns]
     st.dataframe(df_show[cols_show], use_container_width=True, hide_index=True)
     st.caption(f"Total: {len(df_show)} visitas")
@@ -946,7 +947,12 @@ def pagina_historial():
     st.markdown("---")
     st.subheader("🔍 Ver detalle de una visita")
     if "pdv" in df_show.columns and len(df_show):
-        opciones = df_show.apply(lambda r: f"{r['fecha'].date() if pd.notna(r['fecha']) else '?'} | {r.get('pdv','?')} | {r.get('tipo_visita','?')}", axis=1).tolist()
+        opciones = df_show.apply(
+            lambda r: (
+                f"{r['fecha'].date() if pd.notna(r.get('fecha')) else '?'}"
+                f" | {r.get('pdv','?')} | {r.get('tipo_visita','?')}"
+            ), axis=1
+        ).tolist()
         sel = st.selectbox("Selecciona una visita", opciones, key="detalle_sel")
         idx = opciones.index(sel)
         row = df_show.iloc[idx]
