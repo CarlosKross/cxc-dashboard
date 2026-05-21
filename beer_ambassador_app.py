@@ -87,10 +87,11 @@ CRM_SHEET_ID = "1IvZCIHk_kHkqLrHhrsfTxfTkRC9gVelk9lNgpYbFPZI"
 SCOPES      = ["https://spreadsheets.google.com/feeds",
                "https://www.googleapis.com/auth/drive"]
 
-EJECUTIVOS_VALIDOS = [
-    "Armiro Perez", "Carlos Echeverria", "Carol Ibaceta",
-    "Francisco Carreño", "Gerson Astudillo",
-]
+# Valores que NO son ejecutivos reales (excluir en lugar de filtrar por lista blanca)
+EJECUTIVOS_EXCLUIR = {
+    "", "nan", "ex cliente", "sin patente", "venta spot",
+    "clausurado", "ejecutivo",
+}
 VARIEDADES_BASE = [
     "Golden", "Pils", "Maibock", "Stout", "K5",
     "Hoppy", "Berries", "Hazy Lager", "Ipa", "Ipa Pomelo",
@@ -135,7 +136,8 @@ def _procesar_crm(df_maestra, df_ventas):
         return None
 
     df = df[df[col_activo].str.lower().isin(["si", "sí"])]
-    df = df[df[col_ejec].isin(EJECUTIVOS_VALIDOS)]
+    df = df[~df[col_ejec].str.lower().isin(EJECUTIVOS_EXCLUIR)]
+    df = df[df[col_ejec].str.strip() != ""]
 
     clientes = {}
     for _, row in df.iterrows():
