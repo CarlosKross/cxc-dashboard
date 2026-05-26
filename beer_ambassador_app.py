@@ -109,10 +109,10 @@ DIAS = {
 }
 
 METAS = {
-    "Prospección y Cierres":  (5,  0.40),
-    "Implementación Promos":  (5,  0.20),
-    "Capacitación PDV":       (10, 0.20),
-    "Auditorías Calidad":     (20, 0.20),
+    "Prospección y Cierres": (5,  0.40),
+    "Activaciones":          (5,  0.20),
+    "Capacitación PDV":      (10, 0.20),
+    "Auditorías Calidad":    (20, 0.20),
 }
 
 
@@ -372,6 +372,11 @@ def load_visitas() -> pd.DataFrame:
 
 
 def save_visita(row: dict, fotos: dict):
+    # Agregar hora actual a la fecha (el date_input solo guarda la fecha)
+    from datetime import datetime as _dt
+    row = dict(row)
+    row["fecha"] = f"{row.get('fecha', '')} {_dt.now().strftime('%H:%M:%S')}"
+
     # Fotos → solo en modo local (en cloud se omiten)
     if not _usar_gsheets():
         DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -415,11 +420,12 @@ def calc_kpis(df, mes, anio):
     df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
     m = (df["fecha"].dt.month == mes) & (df["fecha"].dt.year == anio)
     d = df[m]
+    tv = d.get("tipo_visita", pd.Series(dtype=str))
     return {
-        "Prospección y Cierres": int((d.get("tipo_visita", pd.Series()) == "Prospección").sum()),
-        "Implementación Promos": int((d.get("tiene_activacion", pd.Series()) == True).sum()),
-        "Capacitación PDV":      int((d.get("tipo_visita", pd.Series()) == "Capacitación").sum()),
-        "Auditorías Calidad":    int((d.get("tipo_visita", pd.Series()) == "Auditoría").sum()),
+        "Prospección y Cierres": int((tv == "Prospección").sum()),
+        "Activaciones":          int((tv == "Activación").sum()),
+        "Capacitación PDV":      int((tv == "Capacitación").sum()),
+        "Auditorías Calidad":    int((tv == "Auditoría").sum()),
     }
 
 
@@ -955,6 +961,8 @@ def pagina_historial():
     if "fecha" in df_show.columns:
         df_show["fecha"] = pd.to_datetime(df_show["fecha"], errors="coerce")
         df_show = df_show.sort_values("fecha", ascending=False)
+        # Formato legible: "26/05/2026 14:35" sin microsegundos
+        df_show["fecha"] = df_show["fecha"].dt.strftime("%d/%m/%Y %H:%M")
 
     cols_base = ["fecha", "pdv", "ejecutivo", "tipo_visita", "ambassador"]
     cols_show = [c for c in cols_base if c in df_show.columns]
