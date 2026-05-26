@@ -379,13 +379,14 @@ def save_visita(row: dict, fotos: dict):
         # Modo cloud → guardar en Google Sheets
         try:
             ws = _get_worksheet()
-            # Verificar si A1 tiene un encabezado válido (no es TRUE/FALSE ni vacío)
-            a1 = ws.acell("A1").value or ""
-            if a1.strip() in ("", "TRUE", "FALSE") :
+            # Escribir encabezados si A1 no es exactamente "fecha"
+            # (cubre: sheet vacío, encabezados corruptos, datos sin encabezado)
+            a1 = (ws.acell("A1").value or "").strip()
+            if a1 != "fecha":
                 ws.clear()
                 ws.append_row(list(row.keys()))
-            ws.append_row(list(row.values()))
-            # Invalidar caché para que load_visitas lea lo nuevo
+            ws.append_row([str(v) if not isinstance(v, (str, int, float, bool)) else v
+                           for v in row.values()])
             _get_worksheet.clear()
         except Exception as e:
             st.error(f"❌ Error al guardar en Google Sheets: {e}")
