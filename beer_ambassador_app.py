@@ -82,7 +82,8 @@ DATA_PATH   = Path(__file__).parent / "data" / "beer_ambassador_visitas.csv"
 FOTOS_PATH  = Path(__file__).parent / "data" / "fotos"
 CRM_PATH    = Path(__file__).parent / "data" / "CRM_Comercial.xlsx"
 SHEET_ID    = "1OrV3TVFvR52VQrmqWOGxqRk9lbtYNWdTbxS34Gn_AGU"
-SHEET_NAME  = "Visitas"
+# Una pestaña por tipo de visita → sin mezcla de conceptos
+VISITAS_SHEETS = ["Auditoría", "Capacitación", "Activación", "Prospección"]
 CRM_SHEET_ID = "1IvZCIHk_kHkqLrHhrsfTxfTkRC9gVelk9lNgpYbFPZI"
 SCOPES      = ["https://spreadsheets.google.com/feeds",
                "https://www.googleapis.com/auth/drive"]
@@ -318,36 +319,51 @@ def _usar_gsheets():
 
 
 @st.cache_resource(ttl=60)
-def _get_worksheet():
+def _get_worksheet(sheet_name: str = "Auditoría"):
     creds = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"], scopes=SCOPES
     )
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(SHEET_ID)
     try:
-        ws = sh.worksheet(SHEET_NAME)
+        ws = sh.worksheet(sheet_name)
     except gspread.WorksheetNotFound:
-        ws = sh.add_worksheet(title=SHEET_NAME, rows=5000, cols=80)
+        ws = sh.add_worksheet(title=sheet_name, rows=5000, cols=80)
     return ws
 
 
 # ── Helpers de datos ──────────────────────────────────────────────────────────
 
+def _leer_sheet(sheet_name: str) -> pd.DataFrame:
+    """Lee una pestaña de Visitas y retorna DataFrame con columna tipo_visita garantizada."""
+    try:
+        ws   = _get_worksheet(sheet_name)
+        data = ws.get_all_values()
+        if not data or len(data) < 2:
+            return pd.DataFrame()
+        headers = data[0]
+        if headers[0] != "fecha":          # encabezado corrupto → ignorar
+            return pd.DataFrame()
+        rows = [r for r in data[1:] if any(c.strip() for c in r)]
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows, columns=headers)
+        # Asegurar que tipo_visita refleje la pestaña de origen
+        if "tipo_visita" not in df.columns:
+            df["tipo_visita"] = sheet_name
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
 def load_visitas() -> pd.DataFrame:
     if _usar_gsheets():
         try:
-            ws = _get_worksheet()
-            # get_all_values() evita el error de cabeceras duplicadas
-            data = ws.get_all_values()
-            if not data or len(data) < 2:
-                return pd.DataFrame()
-            headers = data[0]
-            rows    = data[1:]
-            # Filtrar filas completamente vacías
-            rows = [r for r in rows if any(c.strip() for c in r)]
-            if not rows:
-                return pd.DataFrame()
-            return pd.DataFrame(rows, columns=headers)
+            partes = [_leer_sheet(s) for s in VISITAS_SHEETS]
+            partes = [d for d in partes if not d.empty]
+            if partes:
+                return pd.concat(partes, ignore_index=True)
+            return pd.DataFrame()
         except Exception as e:
             st.warning(f"⚠️ No se pudo leer Google Sheets: {e}")
     if DATA_PATH.exists():
@@ -376,18 +392,17 @@ def save_visita(row: dict, fotos: dict):
         df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
         df.to_csv(DATA_PATH, index=False)
     else:
-        # Modo cloud → guardar en Google Sheets
+        # Modo cloud → guardar en la pestaña que corresponde al tipo de visita
         try:
-            ws = _get_worksheet()
-            # Escribir encabezados si A1 no es exactamente "fecha"
-            # (cubre: sheet vacío, encabezados corruptos, datos sin encabezado)
-            a1 = (ws.acell("A1").value or "").strip()
+            sheet_name = row.get("tipo_visita", "Auditoría")
+            ws  = _get_worksheet(sheet_name)
+            a1  = (ws.acell("A1").value or "").strip()
             if a1 != "fecha":
                 ws.clear()
                 ws.append_row(list(row.keys()))
             ws.append_row([str(v) if not isinstance(v, (str, int, float, bool)) else v
                            for v in row.values()])
-            _get_worksheet.clear()
+            _get_worksheet.clear()   # invalida caché de todas las pestañas
         except Exception as e:
             st.error(f"❌ Error al guardar en Google Sheets: {e}")
 
