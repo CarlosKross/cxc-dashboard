@@ -331,22 +331,48 @@ def _get_drive():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-@st.cache_data(ttl=86400)
-def _get_fotos_folder_id():
-    """Obtiene (o crea) la carpeta raíz de fotos en Drive."""
-    svc = _get_drive()
-    res = svc.files().list(
-        q=f"name='{FOTOS_DRIVE_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-        fields="files(id)"
-    ).execute()
-    files = res.get("files", [])
-    if files:
-        return files[0]["id"]
-    meta  = {"name": FOTOS_DRIVE_FOLDER, "mimeType": "application/vnd.google-apps.folder"}
-    folder = svc.files().create(body=meta, fields="id").execute()
-    fid    = folder["id"]
-    svc.permissions().create(fileId=fid, body={"type": "anyone", "role": "reader"}).execute()
-    return fid
+def _get_fotos_folder_id() -> str:
+    """Obtiene el ID de la carpeta de fotos en Drive.
+
+    Orden de búsqueda:
+    1. st.secrets["drive_fotos_folder_id"]  ← configura esto en secrets.toml
+    2. Busca una carpeta llamada FOTOS_DRIVE_FOLDER en las carpetas compartidas
+       con la cuenta de servicio (funciona si el usuario la compartió como Editor).
+    Lanza RuntimeError si no se encuentra ninguna.
+    """
+    # 1. Secrets (recomendado)
+    try:
+        fid = st.secrets.get("drive_fotos_folder_id", "")
+        if fid:
+            return str(fid).strip()
+    except Exception:
+        pass
+
+    # 2. Buscar en Drive (carpeta compartida con la cuenta de servicio)
+    try:
+        svc = _get_drive()
+        res = svc.files().list(
+            q=(f"name='{FOTOS_DRIVE_FOLDER}' "
+               "and mimeType='application/vnd.google-apps.folder' "
+               "and trashed=false"),
+            fields="files(id,name)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+        ).execute()
+        files = res.get("files", [])
+        if files:
+            return files[0]["id"]
+    except Exception as e:
+        raise RuntimeError(f"Error al buscar carpeta en Drive: {e}") from e
+
+    raise RuntimeError(
+        f"Carpeta '{FOTOS_DRIVE_FOLDER}' no encontrada en Drive. "
+        "Para habilitar las fotos:\n"
+        "1. Crea la carpeta en tu Google Drive personal.\n"
+        "2. Compártela con beer-ambassador-bot@beer-ambassador.iam.gserviceaccount.com como Editor.\n"
+        "3. Copia el ID de la carpeta desde la URL (la parte después de /folders/).\n"
+        "4. Agrega  drive_fotos_folder_id = \"PEGA_EL_ID_AQUÍ\"  en tu secrets.toml."
+    )
 
 
 def _subir_fotos_drive(fotos: dict, slug: str) -> dict:
@@ -356,16 +382,26 @@ def _subir_fotos_drive(fotos: dict, slug: str) -> dict:
 
     if not any(fotos.values()):
         return {}
-    try:
-        svc       = _get_drive()
-        folder_id = _get_fotos_folder_id()
 
-        # Subcarpeta por visita
+    # Obtener carpeta destino
+    try:
+        folder_id = _get_fotos_folder_id()
+    except RuntimeError as e:
+        st.error(f"❌ Fotos no subidas — {e}")
+        return {}
+
+    try:
+        svc = _get_drive()
+
+        # Subcarpeta por visita (dentro de la carpeta del usuario)
         sub = svc.files().create(
-            body={"name": slug[:60],
-                  "mimeType": "application/vnd.google-apps.folder",
-                  "parents": [folder_id]},
-            fields="id"
+            body={
+                "name": slug[:60],
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [folder_id],
+            },
+            fields="id",
+            supportsAllDrives=True,
         ).execute()
         sub_id = sub["id"]
 
@@ -379,16 +415,21 @@ def _subir_fotos_drive(fotos: dict, slug: str) -> dict:
                 media = MediaIoBaseUpload(io.BytesIO(f.getbuffer()), mimetype=mime)
                 uploaded = svc.files().create(
                     body={"name": f.name, "parents": [sub_id]},
-                    media_body=media, fields="id"
+                    media_body=media,
+                    fields="id",
+                    supportsAllDrives=True,
                 ).execute()
                 fid = uploaded["id"]
                 svc.permissions().create(
-                    fileId=fid, body={"type": "anyone", "role": "reader"}
+                    fileId=fid,
+                    body={"type": "anyone", "role": "reader"},
+                    supportsAllDrives=True,
                 ).execute()
                 urls[seccion].append(f"https://drive.google.com/uc?id={fid}")
         return urls
+
     except Exception as e:
-        st.warning(f"⚠️ No se pudieron subir fotos a Drive: {e}")
+        st.error(f"❌ Error al subir fotos a Drive: {e}")
         return {}
 
 
