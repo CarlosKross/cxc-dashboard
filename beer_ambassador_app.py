@@ -318,6 +318,82 @@ def _usar_gsheets():
         return False
 
 
+# ── Google Drive (fotos) ──────────────────────────────────────────────────────
+
+FOTOS_DRIVE_FOLDER = "Beer Ambassador · Fotos"
+
+@st.cache_resource
+def _get_drive():
+    from googleapiclient.discovery import build
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"], scopes=SCOPES
+    )
+    return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+
+@st.cache_data(ttl=86400)
+def _get_fotos_folder_id():
+    """Obtiene (o crea) la carpeta raíz de fotos en Drive."""
+    svc = _get_drive()
+    res = svc.files().list(
+        q=f"name='{FOTOS_DRIVE_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+        fields="files(id)"
+    ).execute()
+    files = res.get("files", [])
+    if files:
+        return files[0]["id"]
+    meta  = {"name": FOTOS_DRIVE_FOLDER, "mimeType": "application/vnd.google-apps.folder"}
+    folder = svc.files().create(body=meta, fields="id").execute()
+    fid    = folder["id"]
+    svc.permissions().create(fileId=fid, body={"type": "anyone", "role": "reader"}).execute()
+    return fid
+
+
+def _subir_fotos_drive(fotos: dict, slug: str) -> dict:
+    """Sube fotos a Drive y retorna {seccion: [url_directa, ...]}."""
+    from googleapiclient.http import MediaIoBaseUpload
+    import io, mimetypes
+
+    if not any(fotos.values()):
+        return {}
+    try:
+        svc       = _get_drive()
+        folder_id = _get_fotos_folder_id()
+
+        # Subcarpeta por visita
+        sub = svc.files().create(
+            body={"name": slug[:60],
+                  "mimeType": "application/vnd.google-apps.folder",
+                  "parents": [folder_id]},
+            fields="id"
+        ).execute()
+        sub_id = sub["id"]
+
+        urls = {}
+        for seccion, archivos in fotos.items():
+            if not archivos:
+                continue
+            urls[seccion] = []
+            for f in archivos:
+                mime = mimetypes.guess_type(f.name)[0] or "image/jpeg"
+                media = MediaIoBaseUpload(io.BytesIO(f.getbuffer()), mimetype=mime)
+                uploaded = svc.files().create(
+                    body={"name": f.name, "parents": [sub_id]},
+                    media_body=media, fields="id"
+                ).execute()
+                fid = uploaded["id"]
+                svc.permissions().create(
+                    fileId=fid, body={"type": "anyone", "role": "reader"}
+                ).execute()
+                urls[seccion].append(f"https://drive.google.com/uc?id={fid}")
+        return urls
+    except Exception as e:
+        st.warning(f"⚠️ No se pudieron subir fotos a Drive: {e}")
+        return {}
+
+
+# ── Google Sheets (visitas) ───────────────────────────────────────────────────
+
 @st.cache_resource(ttl=60)
 def _get_worksheet(sheet_name: str = "Auditoría"):
     creds = Credentials.from_service_account_info(
@@ -397,7 +473,18 @@ def save_visita(row: dict, fotos: dict):
         df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
         df.to_csv(DATA_PATH, index=False)
     else:
-        # Modo cloud → guardar en la pestaña que corresponde al tipo de visita
+        # Modo cloud → subir fotos a Drive + guardar en pestaña correspondiente
+        # 1. Fotos → Google Drive
+        if fotos and any(fotos.values()):
+            slug = (f"{row.get('fecha','')[:10]}_"
+                    f"{row.get('pdv','')[:20].replace(' ','_')}_"
+                    f"{row.get('tipo_visita','')}")
+            fotos_urls = _subir_fotos_drive(fotos, slug)
+            row["fotos_json"] = json.dumps(fotos_urls, ensure_ascii=False)
+        else:
+            row["fotos_json"] = ""
+
+        # 2. Datos → Google Sheets
         try:
             sheet_name = row.get("tipo_visita", "Auditoría")
             ws  = _get_worksheet(sheet_name)
@@ -407,7 +494,7 @@ def save_visita(row: dict, fotos: dict):
                 ws.append_row(list(row.keys()))
             ws.append_row([str(v) if not isinstance(v, (str, int, float, bool)) else v
                            for v in row.values()])
-            _get_worksheet.clear()   # invalida caché de todas las pestañas
+            _get_worksheet.clear()
         except Exception as e:
             st.error(f"❌ Error al guardar en Google Sheets: {e}")
 
@@ -975,8 +1062,7 @@ def pagina_historial():
     if "pdv" in df_show.columns and len(df_show):
         opciones = df_show.apply(
             lambda r: (
-                f"{r['fecha'].date() if pd.notna(r.get('fecha')) else '?'}"
-                f" | {r.get('pdv','?')} | {r.get('tipo_visita','?')}"
+                f"{r.get('fecha','?')} | {r.get('pdv','?')} | {r.get('tipo_visita','?')}"
             ), axis=1
         ).tolist()
         sel = st.selectbox("Selecciona una visita", opciones, key="detalle_sel")
@@ -984,17 +1070,22 @@ def pagina_historial():
         row = df_show.iloc[idx]
         st.json(row.dropna().to_dict())
 
-        # Mostrar fotos si existen
-        if "fotos_json" in row and pd.notna(row["fotos_json"]):
+        # Mostrar fotos (Drive URL o ruta local)
+        fotos_raw = row.get("fotos_json", "") if "fotos_json" in row else ""
+        if pd.notna(fotos_raw) and str(fotos_raw).strip() not in ("", "{}"):
             try:
-                fotos_dict = json.loads(row["fotos_json"])
-                for sec, rutas in fotos_dict.items():
+                fotos_dict = json.loads(fotos_raw)
+                for sec, items in fotos_dict.items():
+                    if not items:
+                        continue
                     st.markdown(f"**📷 {sec}**")
-                    cols_img = st.columns(min(len(rutas), 4))
-                    for i, ruta in enumerate(rutas):
-                        if Path(ruta).exists():
-                            with cols_img[i % 4]:
-                                st.image(ruta, use_container_width=True)
+                    cols_img = st.columns(min(len(items), 4))
+                    for i, src in enumerate(items):
+                        with cols_img[i % 4]:
+                            if str(src).startswith("http"):
+                                st.image(src, use_container_width=True)
+                            elif Path(src).exists():
+                                st.image(src, use_container_width=True)
             except Exception:
                 pass
 
