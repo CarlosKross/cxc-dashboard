@@ -318,119 +318,67 @@ def _usar_gsheets():
         return False
 
 
-# ── Google Drive (fotos) ──────────────────────────────────────────────────────
+# ── Fotos → ImgBB (hosting gratuito de imágenes) ─────────────────────────────
+# Las cuentas de servicio de Google no tienen cuota de almacenamiento Drive,
+# por eso usamos ImgBB como backend de fotos.
+# Obtén tu API key gratis en https://api.imgbb.com/
 
-FOTOS_DRIVE_FOLDER = "Beer Ambassador · Fotos"
+def _subir_fotos_imgbb(fotos: dict, slug: str) -> dict:
+    """Sube fotos a ImgBB y retorna {seccion: [url_publica, ...]}."""
+    import requests, base64
 
-@st.cache_resource
-def _get_drive():
-    from googleapiclient.discovery import build
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], scopes=SCOPES
-    )
-    return build("drive", "v3", credentials=creds, cache_discovery=False)
-
-
-def _get_fotos_folder_id() -> str:
-    """Obtiene el ID de la carpeta de fotos en Drive.
-
-    Orden de búsqueda:
-    1. st.secrets["drive_fotos_folder_id"]  ← configura esto en secrets.toml
-    2. Busca una carpeta llamada FOTOS_DRIVE_FOLDER en las carpetas compartidas
-       con la cuenta de servicio (funciona si el usuario la compartió como Editor).
-    Lanza RuntimeError si no se encuentra ninguna.
-    """
-    # 1. Secrets (recomendado)
+    # Leer API key desde secrets
     try:
-        fid = st.secrets.get("drive_fotos_folder_id", "")
-        if fid:
-            return str(fid).strip()
+        api_key = st.secrets.get("imgbb_api_key", "")
     except Exception:
-        pass
+        api_key = ""
 
-    # 2. Buscar en Drive (carpeta compartida con la cuenta de servicio)
-    try:
-        svc = _get_drive()
-        res = svc.files().list(
-            q=(f"name='{FOTOS_DRIVE_FOLDER}' "
-               "and mimeType='application/vnd.google-apps.folder' "
-               "and trashed=false"),
-            fields="files(id,name)",
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-        ).execute()
-        files = res.get("files", [])
-        if files:
-            return files[0]["id"]
-    except Exception as e:
-        raise RuntimeError(f"Error al buscar carpeta en Drive: {e}") from e
-
-    raise RuntimeError(
-        f"Carpeta '{FOTOS_DRIVE_FOLDER}' no encontrada en Drive. "
-        "Para habilitar las fotos:\n"
-        "1. Crea la carpeta en tu Google Drive personal.\n"
-        "2. Compártela con beer-ambassador-bot@beer-ambassador.iam.gserviceaccount.com como Editor.\n"
-        "3. Copia el ID de la carpeta desde la URL (la parte después de /folders/).\n"
-        "4. Agrega  drive_fotos_folder_id = \"PEGA_EL_ID_AQUÍ\"  en tu secrets.toml."
-    )
-
-
-def _subir_fotos_drive(fotos: dict, slug: str) -> dict:
-    """Sube fotos a Drive y retorna {seccion: [url_directa, ...]}."""
-    from googleapiclient.http import MediaIoBaseUpload
-    import io, mimetypes
+    if not api_key:
+        st.error(
+            "❌ Fotos no subidas — falta `imgbb_api_key` en secrets.toml.\n"
+            "Obtén tu clave gratis en https://api.imgbb.com/ y agrégala a los Secrets."
+        )
+        return {}
 
     if not any(fotos.values()):
         return {}
 
-    # Obtener carpeta destino
-    try:
-        folder_id = _get_fotos_folder_id()
-    except RuntimeError as e:
-        st.error(f"❌ Fotos no subidas — {e}")
-        return {}
+    urls = {}
+    total = sum(len(v) for v in fotos.values() if v)
+    progreso = st.progress(0, text="Subiendo fotos…")
+    subidas = 0
 
-    try:
-        svc = _get_drive()
+    for seccion, archivos in fotos.items():
+        if not archivos:
+            continue
+        urls[seccion] = []
+        for f in archivos:
+            try:
+                img_b64 = base64.b64encode(f.getbuffer()).decode("utf-8")
+                resp = requests.post(
+                    "https://api.imgbb.com/1/upload",
+                    data={
+                        "key":   api_key,
+                        "image": img_b64,
+                        "name":  f"{slug[:40]}_{seccion}_{f.name}",
+                    },
+                    timeout=30,
+                )
+                if resp.ok and resp.json().get("success"):
+                    url = resp.json()["data"]["url"]
+                    urls[seccion].append(url)
+                else:
+                    st.warning(f"⚠️ No se pudo subir {f.name}: {resp.text[:200]}")
+            except Exception as e:
+                st.warning(f"⚠️ Error subiendo {f.name}: {e}")
+            subidas += 1
+            progreso.progress(subidas / total, text=f"Subiendo fotos… {subidas}/{total}")
 
-        # Subcarpeta por visita (dentro de la carpeta del usuario)
-        sub = svc.files().create(
-            body={
-                "name": slug[:60],
-                "mimeType": "application/vnd.google-apps.folder",
-                "parents": [folder_id],
-            },
-            fields="id",
-            supportsAllDrives=True,
-        ).execute()
-        sub_id = sub["id"]
-
-        urls = {}
-        for seccion, archivos in fotos.items():
-            if not archivos:
-                continue
-            urls[seccion] = []
-            for f in archivos:
-                mime = mimetypes.guess_type(f.name)[0] or "image/jpeg"
-                media = MediaIoBaseUpload(io.BytesIO(f.getbuffer()), mimetype=mime)
-                uploaded = svc.files().create(
-                    body={"name": f.name, "parents": [sub_id]},
-                    media_body=media,
-                    fields="id",
-                    supportsAllDrives=True,
-                ).execute()
-                fid = uploaded["id"]
-                svc.permissions().create(
-                    fileId=fid,
-                    body={"type": "anyone", "role": "reader"},
-                    supportsAllDrives=True,
-                ).execute()
-                urls[seccion].append(f"https://drive.google.com/uc?id={fid}")
-        return urls
-
-    except Exception as e:
-        st.error(f"❌ Error al subir fotos a Drive: {e}")
-        return {}
+    progreso.empty()
+    if urls:
+        total_ok = sum(len(v) for v in urls.values())
+        st.success(f"📷 {total_ok} foto(s) subidas correctamente a ImgBB.")
+    return urls
 
 
 # ── Google Sheets (visitas) ───────────────────────────────────────────────────
@@ -514,13 +462,13 @@ def save_visita(row: dict, fotos: dict):
         df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
         df.to_csv(DATA_PATH, index=False)
     else:
-        # Modo cloud → subir fotos a Drive + guardar en pestaña correspondiente
-        # 1. Fotos → Google Drive
+        # Modo cloud → subir fotos a ImgBB + guardar en pestaña correspondiente
+        # 1. Fotos → ImgBB
         if fotos and any(fotos.values()):
             slug = (f"{row.get('fecha','')[:10]}_"
                     f"{row.get('pdv','')[:20].replace(' ','_')}_"
                     f"{row.get('tipo_visita','')}")
-            fotos_urls = _subir_fotos_drive(fotos, slug)
+            fotos_urls = _subir_fotos_imgbb(fotos, slug)
             row["fotos_json"] = json.dumps(fotos_urls, ensure_ascii=False)
         else:
             row["fotos_json"] = ""
