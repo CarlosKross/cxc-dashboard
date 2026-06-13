@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Kross Match</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;color:#f0f0f0}
+    /* Previene zoom en inputs iOS */
+    input,button,select,textarea{font-size:16px}
+
+    /* ── FONDO DARK GRAIN (Kross Black) ── */
+    body{
+      background-color:#111111;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)' opacity='0.07'/%3E%3C/svg%3E");
+      background-size:300px 300px;
+    }
+    body::before{
+      content:'';position:fixed;inset:0;
+      background:radial-gradient(ellipse at 50% 0%,rgba(245,179,0,.04) 0%,transparent 60%),
+                 linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.35) 50%,rgba(0,0,0,.7) 100%);
+      pointer-events:none;z-index:0;
+    }
+
+    /* ── PANTALLAS ── */
+    .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+      justify-content:flex-start;padding:20px 16px 40px;overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+      opacity:0;pointer-events:none;transition:opacity .35s ease;z-index:1}
+    .screen.active{opacity:1;pointer-events:all}
+    .screen.slide-in{animation:slideIn .38s cubic-bezier(.25,.46,.45,.94) forwards}
+    @keyframes slideIn{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:translateX(0)}}
+
+    /* ── LOGO ── */
+    .logo-wrap{text-align:center;margin-bottom:20px;margin-top:12px}
+    .logo-svg-wrap{display:flex;justify-content:center;margin-bottom:8px}
+    .logo-sub{font-size:.62rem;color:#888;letter-spacing:4px;text-transform:uppercase;margin-top:4px}
+
+    /* ── INPUTS / BOTONES ── */
+    .big-input{width:100%;max-width:380px;padding:15px 18px;
+      background:rgba(255,255,255,.04);
+      border:1.5px solid rgba(245,179,0,.25);border-radius:4px;
+      color:#fff;font-size:16px;text-align:center;outline:none;
+      transition:border .2s,box-shadow .2s;letter-spacing:1px;text-transform:uppercase;
+      font-weight:700}
+    .big-input:focus{border-color:#F5B300;box-shadow:0 0 0 3px rgba(245,179,0,.12)}
+    .big-input::placeholder{color:#555;font-weight:400;text-transform:none;letter-spacing:0}
+
+    .btn-gold{width:100%;max-width:380px;padding:16px;
+      background:#F5B300;color:#111111;font-size:.9rem;font-weight:900;
+      border:none;border-radius:4px;cursor:pointer;letter-spacing:3px;
+      text-transform:uppercase;transition:transform .15s,opacity .2s;
+      margin-top:12px;position:relative;overflow:hidden;
+      box-shadow:0 4px 20px rgba(245,179,0,.3)}
+    .btn-gold:disabled{opacity:.25;cursor:not-allowed;animation:none;box-shadow:none}
+    .btn-gold:not(:disabled){animation:pulse 2.4s ease-in-out infinite}
+    .btn-gold:active:not(:disabled){transform:scale(.98)}
+    @keyframes pulse{0%,100%{box-shadow:0 4px 20px rgba(245,179,0,.3)}
+      50%{box-shadow:0 4px 32px rgba(245,179,0,.65),0 0 0 6px rgba(245,179,0,.08)}}
+
+    .btn-outline{width:100%;max-width:380px;padding:13px;background:transparent;
+      border:1.5px solid rgba(245,179,0,.35);color:#F5B300;font-size:.82rem;
+      font-weight:700;letter-spacing:2px;text-transform:uppercase;
+      border-radius:4px;cursor:pointer;transition:all .2s;margin-top:10px}
+    .btn-outline:active{border-color:#F5B300;background:rgba(245,179,0,.07)}
+
+    /* ── PROGRESS BAR ── */
+    .progress-bar-wrap{width:100%;max-width:420px;margin-bottom:14px}
+    .progress-bar-track{width:100%;height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden}
+    .progress-bar-fill{height:2px;background:#F5B300;border-radius:1px;transition:width .4s ease}
+    .progress-label{font-size:.58rem;color:#666;letter-spacing:2px;text-align:right;margin-top:5px;text-transform:uppercase}
+
+    /* ── QUIZ CARDS ── */
+    .quiz-wrap{width:100%;max-width:420px}
+    .quiz-card{background:#1B1B1B;border:1px solid rgba(245,179,0,.2);
+      border-radius:8px;padding:16px;margin-bottom:10px}
+    .quiz-card h2{font-size:.78rem;color:#F5B300;margin-bottom:12px;
+      letter-spacing:3px;text-transform:uppercase;font-weight:900}
+    .opts{display:flex;flex-wrap:wrap;gap:8px}
+
+    /* Opciones como cards */
+    .opt{padding:10px 12px;border-radius:6px;border:1.5px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);color:#D9D9D9;cursor:pointer;
+      font-size:.84rem;transition:all .18s;display:flex;align-items:center;gap:8px;
+      flex:1;min-width:130px;position:relative;overflow:hidden}
+    .opt:active{border-color:rgba(245,179,0,.4);background:rgba(245,179,0,.06)}
+    .opt.sel{background:rgba(245,179,0,.1);color:#fff;border-color:#F5B300;font-weight:700;
+      box-shadow:0 0 0 1px rgba(245,179,0,.3)}
+    .opt-icon{width:32px;height:32px;border-radius:4px;display:flex;align-items:center;
+      justify-content:center;background:rgba(255,255,255,.05);flex-shrink:0}
+    .opt-text{line-height:1.3;min-width:0}
+    .opt-text strong{display:block;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .opt-text span{font-size:.66rem;color:#666;margin-top:1px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    #q-cerveza{overflow:hidden;max-height:0;opacity:0;transition:max-height .5s,opacity .4s}
+    #q-cerveza.show{max-height:320px;opacity:1}
+
+    /* ── RESULT CARD v4 dark premium ── */
+    .result-wrap{width:100%;max-width:400px}
+    #match-card{background:#111;border:1.5px solid #F5B300;border-radius:16px;
+      padding:18px 16px 14px;text-align:center;position:relative;overflow:hidden;margin-bottom:14px}
+    #match-card::before{content:'';position:absolute;inset:0;pointer-events:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");z-index:0}
+    #match-card>*{position:relative;z-index:1}
+
+    .mc-ofic{font-size:.52rem;color:#F5B300;letter-spacing:3px;text-transform:uppercase;margin-bottom:1px;opacity:.75}
+    .mc-header{font-size:.68rem;font-weight:700;color:#fff;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px}
+    .mc-archetype{font-size:clamp(1.5rem,8vw,2.3rem);font-weight:900;color:#F5B300;
+      text-transform:uppercase;letter-spacing:1px;line-height:1.05;margin-bottom:8px;
+      text-shadow:0 2px 18px rgba(245,179,0,.35)}
+    .mc-badge{display:inline-flex;flex-direction:column;align-items:center;margin-bottom:10px}
+    .mc-badge-top{background:#F5B300;color:#111;font-size:.72rem;font-weight:900;
+      letter-spacing:2px;padding:3px 18px;border-radius:3px 3px 0 0;text-transform:uppercase}
+    .mc-badge-bot{background:#111;color:#F5B300;border:1px solid #F5B300;
+      font-size:.54rem;font-weight:700;letter-spacing:2px;padding:2px 14px;
+      border-radius:0 0 3px 3px;text-transform:uppercase}
+    .mc-desc{font-size:.78rem;color:#ccc;line-height:1.65;margin-bottom:10px;padding:0 4px}
+    .mc-desc .hl{color:#F5B300;font-weight:800}
+    .rc-foto-wrap{width:100%;margin-bottom:10px;border-radius:8px;overflow:hidden;
+      border:1.5px solid #F5B300;position:relative}
+    .rc-foto{width:100%;height:155px;object-fit:cover;display:block;
+      filter:brightness(.82) saturate(1.25) contrast(1.1)}
+    .rc-foto-overlay{position:absolute;bottom:0;left:0;right:0;height:40px;
+      background:linear-gradient(transparent,#111)}
+    .mc-attrs{display:flex;align-items:stretch;margin-bottom:10px;
+      border:1px solid rgba(245,179,0,.25);border-radius:8px;overflow:hidden}
+    .mc-attr{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;
+      border-right:1px solid rgba(245,179,0,.2)}
+    .mc-attr:last-child{border-right:none}
+    .mc-attr-icon{font-size:1.2rem;margin-bottom:1px}
+    .mc-attr-label{font-size:.48rem;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:1px}
+    .mc-attr-val{font-size:1.05rem;font-weight:900;color:#F5B300}
+    .mc-viral{border:1px solid rgba(255,255,255,.2);border-radius:8px;
+      padding:10px 10px 0;margin-bottom:8px;overflow:hidden}
+    .mc-viral-q{font-size:.65rem;font-weight:700;color:#fff;text-transform:uppercase;
+      letter-spacing:1px;line-height:1.5}
+    .mc-viral-hl{font-size:clamp(.9rem,4.5vw,1.25rem);font-weight:900;color:#F5B300;
+      text-transform:uppercase;letter-spacing:1px;line-height:1.2;margin:2px 0}
+    .mc-viral-cta{display:block;width:calc(100% + 20px);margin:8px -10px 0;
+      background:#F5B300;color:#111;font-size:.88rem;font-weight:900;
+      letter-spacing:2px;text-transform:uppercase;padding:9px}
+    .mc-footer{font-size:.5rem;color:#D68A00;letter-spacing:3px;text-transform:uppercase;
+      border:1px solid rgba(214,138,0,.4);display:inline-block;
+      padding:3px 12px;border-radius:10px;margin-top:4px}
+
+    /* Botón Stories */
+    .btn-stories{width:100%;max-width:400px;padding:17px 14px;
+      background:#F5B300;color:#111111;font-size:.88rem;font-weight:900;
+      border:none;border-radius:4px;cursor:pointer;letter-spacing:3px;
+      text-transform:uppercase;transition:transform .15s;
+      box-shadow:0 4px 20px rgba(245,179,0,.3)}
+    .btn-stories:active{transform:scale(.98)}
+    .hint-share{font-size:.68rem;color:#666;text-align:center;margin-top:8px;line-height:1.7}
+    #btn-ya-compartí{display:none}
+
+    /* ── RULETA ── */
+    .ruleta-wrap{display:flex;flex-direction:column;align-items:center;width:100%;max-width:380px}
+    .ruleta-title{font-size:.58rem;color:#666;text-align:center;margin-bottom:4px;
+      letter-spacing:3px;text-transform:uppercase}
+    .ruleta-nombre{font-size:clamp(1.2rem,5vw,1.55rem);font-weight:900;color:#F5B300;
+      text-align:center;margin-bottom:14px;letter-spacing:2px;text-transform:uppercase}
+    .wheel-container{position:relative;width:min(300px,calc(100vw - 48px));
+      height:min(300px,calc(100vw - 48px));margin-bottom:18px}
+    #wheel-canvas{display:block;width:100%;height:100%;border-radius:50%;
+      filter:drop-shadow(0 0 14px rgba(245,179,0,.18))}
+    .wheel-pointer{position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+      width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;
+      border-top:26px solid #F5B300;filter:drop-shadow(0 2px 6px rgba(245,179,0,.6));z-index:10}
+    .wheel-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:52px;height:52px;background:#111;border:2px solid #F5B300;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:.55rem;color:#F5B300;font-weight:900;
+      text-align:center;z-index:10;text-transform:uppercase;letter-spacing:1px}
+
+    /* ── PREMIO — TICKET ── */
+    .premio-wrap{width:100%;max-width:400px;display:flex;flex-direction:column;
+      align-items:center;gap:10px}
+    .ticket-outer{width:100%;position:relative}
+    .ticket-holes{display:flex;justify-content:space-between;padding:0 14px;margin-bottom:-1px}
+    .ticket-hole{width:13px;height:13px;border-radius:50%;background:#111111;
+      border:1.5px solid rgba(245,179,0,.3)}
+    .ticket-dash{border:none;border-top:2px dashed rgba(245,179,0,.3);margin:0}
+    .premio-card{width:100%;background:#1B1B1B;
+      border-radius:0 0 8px 8px;padding:22px 18px 18px;text-align:center;
+      border:1.5px solid;border-top:none}
+    .ticket-top-card{width:100%;border-radius:8px 8px 0 0;background:#1B1B1B;
+      padding:20px 18px 14px;text-align:center;border:1.5px solid;border-bottom:none}
+    .premio-icon{font-size:2.8rem;display:block;margin-bottom:6px}
+    .premio-titulo{font-size:clamp(1.2rem,5.5vw,1.55rem);font-weight:900;
+      text-transform:uppercase;letter-spacing:2px;margin-bottom:6px}
+    .premio-desc{font-size:.82rem;color:#D9D9D9;line-height:1.6;margin-bottom:14px}
+    .codigo-box{background:rgba(245,179,0,.06);border:1.5px dashed rgba(245,179,0,.4);
+      border-radius:4px;padding:12px;margin-top:4px}
+    .codigo-label{font-size:.56rem;color:#666;letter-spacing:3px;
+      text-transform:uppercase;margin-bottom:6px}
+    .codigo-valor{font-size:clamp(.95rem,4.5vw,1.4rem);font-weight:900;color:#F5B300;
+      letter-spacing:clamp(1px,1.5vw,4px);text-shadow:0 0 12px rgba(245,179,0,.25);
+      word-break:break-all}
+    .urgencia{font-size:.68rem;color:#F5B300;text-align:center;
+      padding:8px 10px;border-radius:4px;
+      background:rgba(245,179,0,.06);border:1px solid rgba(245,179,0,.2);
+      margin-top:8px;line-height:1.6}
+    .instruccion{font-size:.76rem;color:#888;text-align:center;line-height:1.7}
+
+    /* ── CONFETI ── */
+    #confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:100;
+      opacity:0;transition:opacity .3s}
+    #confetti-canvas.active{opacity:1}
+
+    /* ── TARJETA OCULTA PARA CAPTURA ── */
+    #story-card{
+      position:fixed;left:-9999px;top:0;width:360px;height:640px;
+      background:linear-gradient(155deg,#1c0a00,#0d0805 60%);
+      display:flex;flex-direction:column;justify-content:center;align-items:center;
+      text-align:center;padding:30px 24px;font-family:'Segoe UI',sans-serif;overflow:hidden;
+    }
+    #story-card .s-brand{font-size:9px;letter-spacing:5px;color:#d4a017;text-transform:uppercase;margin-bottom:4px}
+    #story-card .s-user{font-size:13px;font-weight:900;color:#f0f0f0;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px}
+    #story-card .s-eye{font-size:9px;color:#555;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px}
+    #story-card .s-perf{font-size:28px;font-weight:900;color:#d4a017;line-height:1;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+    #story-card .s-tag{font-size:12px;color:#ccc;font-style:italic;margin-bottom:10px;line-height:1.5}
+    #story-card .s-div{width:28px;height:2px;background:#d4a017;margin:0 auto 10px}
+    #story-card .s-rat{font-size:12px;color:#f0f0f0;line-height:1.9;white-space:pre-line;margin-bottom:10px}
+    #story-card .s-rar{font-size:8px;color:#d4a017;letter-spacing:2px;text-transform:uppercase;border:1px solid rgba(212,160,23,.4);border-radius:4px;padding:4px 12px;margin-bottom:10px;display:none}
+    #story-card .s-cta{font-size:10px;color:#555;margin-top:10px;line-height:1.7}
+    #story-card .s-hash{font-size:8px;color:#2a2a2a;margin-top:6px}
+  </style>
+</head>
+<body>
+<canvas id="confetti-canvas"></canvas>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA 1: INTRO / NOMBRE
+════════════════════════════════════════ -->
+<div class="screen active" id="s-intro">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%">
+    <div class="logo-wrap">
+      <div class="logo-svg-wrap">
+        <img src="/LOGO KROSS LINEAL_jun2025.png" alt="Kross" style="width:200px;height:auto;mix-blend-mode:multiply;filter:drop-shadow(0 0 12px rgba(212,160,23,.18))"/>
+      </div>
+      <div class="logo-sub" style="margin-top:6px">Descubre tu michelada perfecta</div>
+    </div>
+    <input class="big-input" id="input-nombre" type="text" placeholder="¿Cómo te llamas?" maxlength="20" autocomplete="off" />
+    <button class="btn-gold" id="btn-inicio" disabled>COMENZAR →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA 2: QUIZ
+════════════════════════════════════════ -->
+<div class="screen" id="s-quiz">
+  <div class="quiz-wrap" style="margin-top:16px">
+    <!-- Barra de progreso -->
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="prog-bar" style="width:33%"></div>
+      </div>
+      <div class="progress-label" id="prog-label">Paso 1 de 3</div>
+    </div>
+
+    <!-- Pregunta 1: Tipo -->
+    <div class="quiz-card" id="q-tipo">
+      <h2>¿Qué tipo de cerveza prefieres?</h2>
+      <div class="opts">
+        <div class="opt" data-g="tipo" data-v="lager">
+          <div class="opt-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <ellipse cx="11" cy="15" rx="5" ry="6" fill="rgba(212,160,23,.25)" stroke="#d4a017" stroke-width="1.2"/>
+              <line x1="11" y1="9" x2="11" y2="4" stroke="#d4a017" stroke-width="1.4" stroke-linecap="round"/>
+              <line x1="8" y1="6" x2="11" y2="4" stroke="#d4a017" stroke-width="1.2" stroke-linecap="round"/>
+              <line x1="14" y1="6" x2="11" y2="4" stroke="#d4a017" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="opt-text"><strong>Lager / Ligera</strong><span>Fresca, dorada, suave</span></div>
+        </div>
+        <div class="opt" data-g="tipo" data-v="lupulada">
+          <div class="opt-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <ellipse cx="11" cy="12" rx="4.5" ry="6" fill="rgba(100,160,60,.2)" stroke="#7ac97a" stroke-width="1.2"/>
+              <line x1="11" y1="6" x2="11" y2="2" stroke="#7ac97a" stroke-width="1.4" stroke-linecap="round"/>
+              <ellipse cx="9" cy="9" rx="2.5" ry="3.5" fill="rgba(100,160,60,.15)" stroke="#7ac97a" stroke-width="1" transform="rotate(-25 9 9)"/>
+              <ellipse cx="13" cy="9" rx="2.5" ry="3.5" fill="rgba(100,160,60,.15)" stroke="#7ac97a" stroke-width="1" transform="rotate(25 13 9)"/>
+            </svg>
+          </div>
+          <div class="opt-text"><strong>Lupulada / Frutal</strong><span>Cítrica, amarga, intensa</span></div>
+        </div>
+        <div class="opt" data-g="tipo" data-v="maltosa">
+          <div class="opt-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <rect x="7" y="8" width="8" height="10" rx="2" fill="rgba(140,80,20,.25)" stroke="#c07030" stroke-width="1.2"/>
+              <rect x="9" y="5" width="4" height="4" rx="1" fill="rgba(140,80,20,.2)" stroke="#c07030" stroke-width="1"/>
+              <circle cx="11" cy="15" r="1.5" fill="#c07030" opacity=".5"/>
+            </svg>
+          </div>
+          <div class="opt-text"><strong>Maltosa / Oscura</strong><span>Tostada, densa, profunda</span></div>
+        </div>
+        <div class="opt" data-g="tipo" data-v="frutal">
+          <div class="opt-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <circle cx="11" cy="13" r="6" fill="rgba(200,40,80,.15)" stroke="#e06080" stroke-width="1.2"/>
+              <circle cx="8.5" cy="11" r="3.5" fill="rgba(200,40,80,.1)" stroke="#e06080" stroke-width="1"/>
+              <path d="M11 7 Q12 4 14 4" stroke="#7ac97a" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+            </svg>
+          </div>
+          <div class="opt-text"><strong>Frutal / Especial</strong><span>Dulce, frutal, sorprendente</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pregunta 2: Sabor -->
+    <div class="quiz-card">
+      <h2>¿Cómo te gusta el sabor?</h2>
+      <div class="opts">
+        <div class="opt" data-g="sabor" data-v="suave">
+          <div class="opt-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <circle cx="11" cy="11" r="8" fill="rgba(80,160,200,.12)" stroke="#50a0c8" stroke-width="1.2"/>
+              <path d="M7 12 Q11 8 15 12" stroke="#50a0c8" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+            </svg>
+          </div>
+          <div class="opt-text"><strong>Suave y refrescante</strong><span>Sin sorpresas, fluye</span></div>
+        </div>
+        <div class="opt" data-g="sabor" data-v="intenso">
+          <div class="opt-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <path d="M11 3 L13 9 L19 9 L14 13 L16 19 L11 15 L6 19 L8 13 L3 9 L9 9 Z"
+                fill="rgba(232,80,20,.18)" stroke="#e85020" stroke-width="1.2" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="opt-text"><strong>Intenso y atrevido</strong><span>Que explote el paladar</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pregunta 3: Cerveza (dinámica) -->
+    <div class="quiz-card" id="q-cerveza">
+      <h2 id="q-cerveza-label">¿Cuál cerveza prefieres?</h2>
+      <div class="opts" id="opts-cerveza"></div>
+    </div>
+
+    <button class="btn-gold" id="btn-match" disabled>DESCUBRIR MI PERFIL →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA 3: RESULTADO + SHARE
+════════════════════════════════════════ -->
+<div class="screen" id="s-result">
+  <div class="result-wrap" style="margin-top:12px">
+    <div id="match-card">
+      <div class="mc-ofic">— RESULTADO OFICIAL —</div>
+      <div class="mc-header">TU MATCH PERFECTO ES</div>
+      <div class="mc-archetype" id="rc-perfil"></div>
+      <div class="mc-badge">
+        <div class="mc-badge-top" id="rc-badge-top">TOP 5%</div>
+        <div class="mc-badge-bot" id="rc-badge-bot">ARQUETIPO LEGENDARIO</div>
+      </div>
+      <div class="mc-desc" id="rc-desc"></div>
+      <div class="rc-foto-wrap" id="rc-foto-wrap" style="display:none">
+        <img class="rc-foto" id="rc-foto" src="" alt="" crossorigin="anonymous"/>
+        <div class="rc-foto-overlay"></div>
+      </div>
+      <div class="mc-attrs" id="rc-attrs"></div>
+      <div class="mc-viral">
+        <div class="mc-viral-q">¿QUIÉN ES</div>
+        <div class="mc-viral-hl" id="rc-viral-name"></div>
+        <div class="mc-viral-q">DE TU GRUPO?</div>
+        <div class="mc-viral-cta">ETIQUÉTALO.</div>
+      </div>
+      <div class="mc-footer" id="rc-footer">ARQUETIPO 01 / 18</div>
+    </div>
+
+    <button class="btn-stories" id="btn-stories">📲 SUBIR A STORIES Y GIRAR LA RULETA</button>
+    <div class="hint-share">Comparte tu match en Instagram Stories<br>y desbloquea la Ruleta de Premios Secreta 🎰</div>
+    <button class="btn-outline" id="btn-ya-compartí">✓ Ya lo subí, quiero girar la ruleta</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA 4: RULETA CRAFT BARREL
+════════════════════════════════════════ -->
+<div class="screen" id="s-ruleta">
+  <div class="ruleta-wrap" style="margin-top:20px">
+    <div class="ruleta-title">Ruleta de Premios Secreta</div>
+    <div class="ruleta-nombre" id="ruleta-nombre">¡Suerte!</div>
+    <div class="wheel-container">
+      <div class="wheel-pointer"></div>
+      <canvas id="wheel-canvas" width="310" height="310"></canvas>
+      <div class="wheel-center" id="wheel-center">GIRA</div>
+    </div>
+    <button class="btn-gold" id="btn-girar">🎰 GIRAR LA RULETA</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANTALLA 5: PREMIO — TICKET PERFORADO
+════════════════════════════════════════ -->
+<div class="screen" id="s-premio">
+  <div class="premio-wrap" style="margin-top:20px">
+
+    <!-- Parte superior del ticket -->
+    <div class="ticket-outer" id="ticket-outer">
+      <div class="ticket-top-card" id="ticket-top">
+        <div class="premio-icon" id="premio-icon"></div>
+        <div class="premio-titulo" id="premio-titulo"></div>
+        <div class="premio-desc" id="premio-desc"></div>
+      </div>
+      <!-- Perforaciones + línea de corte -->
+      <div class="ticket-holes" id="ticket-holes">
+        <!-- generadas por JS -->
+      </div>
+      <hr class="ticket-dash" id="ticket-dash">
+      <!-- Cupón inferior -->
+      <div class="premio-card" id="premio-card">
+        <div class="codigo-box">
+          <div class="codigo-label">Tu código único</div>
+          <div class="codigo-valor" id="codigo-valor"></div>
+        </div>
+        <div class="urgencia">⏰ Válido exclusivamente hoy en esta sucursal</div>
+      </div>
+    </div>
+
+    <div class="instruccion">Muestra este código al garzón<br>para canjear tu premio en la comanda</div>
+    <button class="btn-outline" id="btn-nuevo">↩ Nuevo match</button>
+  </div>
+</div>
+
+<!-- STORY CARD OCULTA -->
+<div id="story-card">
+  <div class="s-brand">Krossbar · Santiago</div>
+  <div class="s-user" id="sc-user"></div>
+  <div class="s-eye">tu match perfecto es</div>
+  <div class="s-perf" id="sc-perf"></div>
+  <div class="s-tag" id="sc-tag"></div>
+  <div class="s-div"></div>
+  <div class="s-rat" id="sc-rat"></div>
+  <div class="s-rar" id="sc-rar"></div>
+  <div class="s-cta">Comparte y etiqueta a tu partner de micheladas</div>
+  <div class="s-hash">#KrossMatch · #Krossbar · #MicheladaPerfecta</div>
+</div>
+
+<script>
+/* ════════════════════════════════════
+   ESTADO GLOBAL
+════════════════════════════════════ */
+let nombre = '';
+let sel = {tipo:null, sabor:null, cerveza:null};
+let matchData = null;
+let wheelAngle = 0;
+let spinning = false;
+let waitingReturn = false;
+
+/* Mapeo tipo → fotos de michelada (Unsplash libre, CORS OK) */
+const FOTOS = {
+  lager:    'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=700&q=80',
+  lupulada: 'https://images.unsplash.com/photo-1566633806827-5af151680745?w=700&q=80',
+  maltosa:  'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=700&q=80',
+  frutal:   'https://images.unsplash.com/photo-1571613316887-6f8d5cbf7ef7?w=700&q=80',
+};
+
+const CERVEZAS = {
+  lager:    [{v:'pils',       l:'Kross Pils',        desc:'German Lager · 5.1% · 25 IBU'},
+             {v:'golden',     l:'Kross Golden',       desc:'Pale Ale · 5.3% · 22 IBU'}],
+  lupulada: [{v:'ipa',        l:'Kross IPA',          desc:'India Pale Ale · 5.7% · 45 IBU'},
+             {v:'ipa_pomelo', l:'Kross IPA Pomelo',   desc:'IPA Experimental · 5.7% · 45 IBU ⭐'},
+             {v:'hazy',       l:'Kross Hazy Lager',   desc:'Lager Lupulada · 5.6% · 35 IBU'}],
+  maltosa:  [{v:'stout',   l:'Kross Stout',   desc:'Cream Stout · 5.4% · 30 IBU'},
+             {v:'maibock', l:'Kross Maibock', desc:'Strong Lager · 6.5% · 25 IBU'},
+             {v:'k5',      l:'Kross K5',      desc:'Strong Ale · 7.2% · 24 IBU ⭐'}],
+  frutal:   [{v:'berries',    l:'Kross Berries',      desc:'Fruit Beer · 5.4% · 12 IBU'}],
+};
+
+const PREMIOS = {
+  upgrade:{icon:'🍊',titulo:'¡UPGRADE GRATIS!',
+    desc:'Tu agregado premium no tiene costo adicional en esta ronda.',
+    borderColor:'#d4a017',titleColor:'#d4a017'},
+  schop:{icon:'🍺',titulo:'¡SCHOP DE LA CASA!',
+    desc:'Un Kross Pils 330cc gratis para tu próxima ronda. ¡El bar invita!',
+    borderColor:'#8b3a1a',titleColor:'#ff9060'},
+  merch:{icon:'🎁',titulo:'¡KIT DE MERCH!',
+    desc:'Te llevas un set de stickers oficiales Krossbar. ¡Coleccionables!',
+    borderColor:'#2a5a2a',titleColor:'#7ac97a'},
+  sigue:{icon:'🎲',titulo:'¡SIGUE PARTICIPANDO!',
+    desc:'Esta vez no fue, pero la próxima puede ser tuya. ¡Sigue disfrutando tu Kross Match!',
+    borderColor:'#444444',titleColor:'#D9D9D9'},
+};
+
+/* Segmentos ruleta — 8 segmentos intercalados */
+const SEGMENTS = [
+  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#1a2a1a', arc:'#4a8a4a', text:'#6ab86a'},
+  {key:'upgrade', label:['UPGRADE','GRATIS'],  icon:'🍊', bg:'#2a1e00', arc:'#F5B300', text:'#F5B300'},
+  {key:'sigue',   label:['SIGUE','JUGANDO'],   icon:'🎲', bg:'#181828', arc:'#5566aa', text:'#7788cc'},
+  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#1a2a1a', arc:'#4a8a4a', text:'#6ab86a'},
+  {key:'schop',   label:['SCHOP','GRATIS'],    icon:'🍺', bg:'#2a0e08', arc:'#aa3020', text:'#ff7060'},
+  {key:'upgrade', label:['UPGRADE','GRATIS'],  icon:'🍊', bg:'#2a1e00', arc:'#F5B300', text:'#F5B300'},
+  {key:'sigue',   label:['SIGUE','JUGANDO'],   icon:'🎲', bg:'#181828', arc:'#5566aa', text:'#7788cc'},
+  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#1a2a1a', arc:'#4a8a4a', text:'#6ab86a'},
+];
+/* Stop angles por tipo (base 6 vueltas = 2160°, +offset por posición de cada segmento)
+   Distribución: merch=37.5% (segs 0,3,7), upgrade=25% (segs 1,5), sigue=25% (segs 2,6), schop=12.5% (seg 4) */
+const STOP_ANGLES = {
+  merch:   [2497.5, 2362.5, 2182.5],
+  upgrade: [2452.5, 2272.5],
+  sigue:   [2407.5, 2227.5],
+  schop:   [2317.5],
+};
+
+/* ════════════════════════════════════
+   NAVEGACIÓN
+════════════════════════════════════ */
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active','slide-in'));
+  const next = document.getElementById(id);
+  next.classList.add('active','slide-in');
+}
+
+/* ════════════════════════════════════
+   PANTALLA 1 — INTRO
+════════════════════════════════════ */
+const inputNombre = document.getElementById('input-nombre');
+inputNombre.addEventListener('input', () => {
+  nombre = inputNombre.value.trim();
+  document.getElementById('btn-inicio').disabled = nombre.length < 2;
+});
+inputNombre.addEventListener('keydown', e => { if (e.key==='Enter' && nombre.length>=2) iniciar(); });
+document.getElementById('btn-inicio').addEventListener('click', iniciar);
+function iniciar() { if (nombre.length < 2) return; goTo('s-quiz'); }
+
+/* ════════════════════════════════════
+   PANTALLA 2 — QUIZ + PROGRESS BAR
+════════════════════════════════════ */
+document.querySelectorAll('.opt').forEach(el => {
+  el.addEventListener('click', () => {
+    const g = el.dataset.g;
+    document.querySelectorAll(`.opt[data-g="${g}"]`).forEach(o => o.classList.remove('sel'));
+    el.classList.add('sel');
+    sel[g] = el.dataset.v;
+    if (g === 'tipo') renderCervezas(sel.tipo);
+    updateProgress();
+    checkMatchBtn();
+  });
+});
+
+function updateProgress() {
+  const steps = [sel.tipo, sel.sabor, sel.cerveza].filter(Boolean).length;
+  const pct = [33,66,100][steps-1] || 0;
+  document.getElementById('prog-bar').style.width = pct + '%';
+  document.getElementById('prog-label').textContent = `Paso ${steps} de 3`;
+}
+
+function renderCervezas(tipo) {
+  sel.cerveza = null;
+  const opts = document.getElementById('opts-cerveza');
+  opts.innerHTML = '';
+  const lista = CERVEZAS[tipo] || [];
+  lista.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'opt'; d.dataset.g = 'cerveza'; d.dataset.v = c.v;
+    d.innerHTML = `<div class="opt-text"><strong>${c.l}</strong><span>${c.desc}</span></div>`;
+    d.addEventListener('click', () => {
+      document.querySelectorAll('.opt[data-g="cerveza"]').forEach(o => o.classList.remove('sel'));
+      d.classList.add('sel'); sel.cerveza = c.v; updateProgress(); checkMatchBtn();
+    });
+    opts.appendChild(d);
+  });
+  document.getElementById('q-cerveza').classList.add('show');
+  // Si solo hay una opción, auto-seleccionarla
+  if (lista.length === 1) {
+    opts.firstChild.classList.add('sel');
+    sel.cerveza = lista[0].v;
+    updateProgress(); checkMatchBtn();
+  }
+}
+
+function checkMatchBtn() {
+  document.getElementById('btn-match').disabled = !(sel.tipo && sel.sabor && sel.cerveza);
+}
+
+document.getElementById('btn-match').addEventListener('click', calcularMatch);
+
+async function calcularMatch() {
+  const btn = document.getElementById('btn-match');
+  btn.disabled = true; btn.textContent = 'Calculando...';
+  try {
+    const res = await fetch('/api/kross-match/calcular', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({tipo:sel.tipo, sabor:sel.sabor, cerveza:sel.cerveza})
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      alert('HTTP ' + res.status + ': ' + txt.substring(0,200));
+      btn.disabled = false; btn.textContent = 'DESCUBRIR MI PERFIL →'; return;
+    }
+    matchData = await res.json();
+    llenarTarjeta(matchData);
+    goTo('s-result');
+  } catch(e) { alert('Error: ' + e.message + ' | sel=' + JSON.stringify(sel)); }
+  btn.disabled = false; btn.textContent = 'DESCUBRIR MI PERFIL →';
+}
+
+/* ════════════════════════════════════
+   ARQUETIPOS META (18 perfiles)
+════════════════════════════════════ */
+const ARQUETIPOS_META = {
+  lager_suave_pils:      {n:'01',top:'TOP 12%',tier:'ARQUETIPO CLÁSICO',
+    desc:'Sin rodeos, sin excesos. Elegiste lo {correcto} desde el principio. La {pureza} no necesita explicación.',
+    attrs:[{i:'🎯',l:'PRECISIÓN',v:'96%'},{i:'🍺',l:'PUREZA',v:'98%'},{i:'⚡',l:'CLARIDAD',v:'94%'}],
+    viral:'El Purista',viralF:'La Purista'},
+  lager_suave_golden:    {n:'02',top:'TOP 18%',tier:'ARQUETIPO EQUILIBRADO',
+    desc:'Ni extremos ni compromisos. Tu {equilibrio} es lo que une al grupo.',
+    attrs:[{i:'⚖️',l:'BALANCE',v:'99%'},{i:'🤝',l:'ARMONÍA',v:'95%'},{i:'🌟',l:'PRESENCIA',v:'90%'}],
+    viral:'El Equilibrado',viralF:'La Equilibrada'},
+  lager_intenso_pils:    {n:'03',top:'TOP 5%',tier:'ARQUETIPO LEGENDARIO',
+    desc:'Observas {posibilidades} donde otros ven ingredientes. Ideas simples en {experiencias memorables}.',
+    attrs:[{i:'🌿',l:'CREATIVIDAD',v:'97%'},{i:'🧪',l:'INNOVACIÓN',v:'94%'},{i:'🌱',l:'EXPLORACIÓN',v:'99%'}],
+    viral:'El Alquimista Verde',viralF:'La Alquimista Verde'},
+  lager_intenso_golden:  {n:'04',top:'TOP 8%',tier:'ARQUETIPO ÉPICO',
+    desc:'La calma es tu superpoder. Encuentras la {perfección} donde otros ven lo ordinario.',
+    attrs:[{i:'🧘',l:'CALMA',v:'98%'},{i:'💧',l:'CLARIDAD',v:'95%'},{i:'🌊',l:'PROFUNDIDAD',v:'97%'}],
+    viral:'El Zen',viralF:'La Zen'},
+  lupulada_suave_ipa:    {n:'05',top:'TOP 15%',tier:'ARQUETIPO IRREVERENTE',
+    desc:'No sigues reglas. El {amargor} tropical y la actitud son tu firma personal.',
+    attrs:[{i:'🍊',l:'ACTITUD',v:'96%'},{i:'🔥',l:'INTENSIDAD',v:'92%'},{i:'💥',l:'ORIGINALIDAD',v:'95%'}],
+    viral:'El Rebelde Cítrico',viralF:'La Rebelde Cítrica'},
+  lupulada_intenso_ipa:  {n:'06',top:'TOP 9%',tier:'ARQUETIPO ÉPICO',
+    desc:'Directo, sin filtros. Tu {presencia} se siente antes de que entres a cualquier lugar.',
+    attrs:[{i:'🎸',l:'CARÁCTER',v:'99%'},{i:'⚡',l:'INTENSIDAD',v:'98%'},{i:'🔊',l:'IMPACTO',v:'97%'}],
+    viral:'El Rockero',viralF:'La Rockera'},
+  lupulada_suave_ipa_pomelo:{n:'07',top:'TOP 10%',tier:'ARQUETIPO ÉPICO',
+    desc:'Tu paladar ya conocía lo mejor antes de que existiera. Elegiste la IPA más {premiada} del mundo.',
+    attrs:[{i:'🏆',l:'SOFISTICACIÓN',v:'96%'},{i:'🍋',l:'ACIDEZ',v:'98%'},{i:'💎',l:'RAREZA',v:'94%'}],
+    viral:'El Citrus Supremo',viralF:'La Citrus Suprema'},
+  lupulada_intenso_ipa_pomelo:{n:'08',top:'TOP 7%',tier:'ARQUETIPO LEGENDARIO',
+    desc:'Brillante e inesperada. El amargor {perfecto} que muy pocos saben apreciar.',
+    attrs:[{i:'⭐',l:'BRILLANTEZ',v:'99%'},{i:'🌺',l:'TROPICAL',v:'97%'},{i:'💫',l:'RAREZA',v:'98%'}],
+    viral:'La Estrella Tropical',viralF:'La Estrella Tropical'},
+  lupulada_suave_hazy:   {n:'09',top:'TOP 14%',tier:'ARQUETIPO ÉPICO',
+    desc:'Siempre pensando en el próximo {horizonte}. La complejidad inesperada te atrae.',
+    attrs:[{i:'🌴',l:'AVENTURA',v:'97%'},{i:'🔍',l:'CURIOSIDAD',v:'95%'},{i:'🌊',l:'FRESCURA',v:'99%'}],
+    viral:'El Explorador Tropical',viralF:'La Exploradora Tropical'},
+  lupulada_intenso_hazy: {n:'10',top:'TOP 8%',tier:'ARQUETIPO LEGENDARIO',
+    desc:'Intensa, atrevida y {difícil de olvidar}. Buscas sabores que exploten en el paladar.',
+    attrs:[{i:'🌶️',l:'INTENSIDAD',v:'10/10'},{i:'🍊',l:'EXPLOSIÓN',v:'10/10'},{i:'🔥',l:'RAREZA',v:'9/10'}],
+    viral:'La Salvaje',viralF:'La Salvaje'},
+  maltosa_suave_stout:   {n:'11',top:'TOP 11%',tier:'ARQUETIPO SOFISTICADO',
+    desc:'Aprecias los {detalles oscuros}. La complejidad es tu lenguaje natural.',
+    attrs:[{i:'📚',l:'PROFUNDIDAD',v:'98%'},{i:'🌙',l:'ELEGANCIA',v:'95%'},{i:'🧠',l:'PERSPECTIVA',v:'97%'}],
+    viral:'El Erudito Nocturno',viralF:'La Erudita Nocturna'},
+  maltosa_intenso_stout: {n:'12',top:'TOP 7%',tier:'ARQUETIPO ÉPICO',
+    desc:'Tú prendes la parrilla y cuentas las mejores {historias}. Humo y carácter en cada sorbo.',
+    attrs:[{i:'🔥',l:'CARÁCTER',v:'99%'},{i:'🥩',l:'INTENSIDAD',v:'97%'},{i:'🌿',l:'TRADICIÓN',v:'96%'}],
+    viral:'El Guardián del Fuego',viralF:'La Guardiana del Fuego'},
+  maltosa_suave_maibock: {n:'13',top:'TOP 16%',tier:'ARQUETIPO CLÁSICO',
+    desc:'Vas a la segura pero con {estilo}. La tradición bien ejecutada nunca falla.',
+    attrs:[{i:'🏛️',l:'TRADICIÓN',v:'98%'},{i:'✨',l:'ESTILO',v:'94%'},{i:'🎯',l:'CONSISTENCIA',v:'96%'}],
+    viral:'El Tradicionalista',viralF:'La Tradicionalista'},
+  maltosa_intenso_maibock:{n:'14',top:'TOP 6%',tier:'ARQUETIPO LEGENDARIO',
+    desc:'Robusto, tostado y con mucho {carácter}. Tradición y fuego en cada sorbo.',
+    attrs:[{i:'⚔️',l:'FORTALEZA',v:'99%'},{i:'🔥',l:'FUEGO',v:'97%'},{i:'🏆',l:'CARÁCTER',v:'98%'}],
+    viral:'El Vikingo',viralF:'La Vikinga'},
+  maltosa_suave_k5:      {n:'15',top:'TOP 6%',tier:'ARQUETIPO LEGENDARIO',
+    desc:'24 medallas mundiales no mienten. Elegiste la cerveza más {premiada} de Chile.',
+    attrs:[{i:'🥇',l:'MAESTRÍA',v:'99%'},{i:'🧪',l:'COMPLEJIDAD',v:'97%'},{i:'🏆',l:'LEGADO',v:'98%'}],
+    viral:'El Maestro',viralF:'La Maestra'},
+  maltosa_intenso_k5:    {n:'16',top:'TOP 5%',tier:'ARQUETIPO LEGENDARIO',
+    desc:'Te gustan las tradiciones, pero con un giro de {fuego}. La combinación más osada.',
+    attrs:[{i:'💪',l:'POTENCIA',v:'100%'},{i:'🔥',l:'COMPLEJIDAD',v:'99%'},{i:'💎',l:'RAREZA',v:'98%'}],
+    viral:'El Indomable',viralF:'La Indomable'},
+  frutal_suave_berries:  {n:'17',top:'TOP 13%',tier:'ARQUETIPO ESPECIAL',
+    desc:'La vida es demasiado corta para lo ordinario. Eres {especial} y lo sabes.',
+    attrs:[{i:'🍓',l:'SENSIBILIDAD',v:'98%'},{i:'🌸',l:'DULZURA',v:'97%'},{i:'✨',l:'SINGULARIDAD',v:'95%'}],
+    viral:'La Romántica',viralF:'La Romántica'},
+  frutal_intenso_berries:{n:'18',top:'TOP 11%',tier:'ARQUETIPO IRREVERENTE',
+    desc:'Mezclas lo dulce con lo {intenso} y siempre te sale bien. Sin reglas.',
+    attrs:[{i:'🌶️',l:'ATREVIMIENTO',v:'98%'},{i:'🍓',l:'CREATIVIDAD',v:'96%'},{i:'💥',l:'EXPLOSIÓN',v:'99%'}],
+    viral:'La Atrevida',viralF:'La Atrevida'},
+};
+
+/* ────────────────────────────────────
+   Detección de género por nombre
+──────────────────────────────────── */
+const NOMBRES_FEMENINOS = new Set([
+  'maria','ana','sofia','valentina','camila','isabella','lucia','martina','valeria','gabriela',
+  'paula','carolina','andrea','patricia','claudia','monica','veronica','natalia','alejandra',
+  'daniela','fernanda','jessica','stephanie','katherine','karen','diana','paola','viviana',
+  'rosa','gloria','lorena','marcela','pilar','constanza','francisca','javiera','trinidad',
+  'antonia','catalina','josefina','isidora','beatriz','carla','barbara','roxana','silvia',
+  'susana','carmen','elena','laura','sara','rebeca','raquel','eva','alba','irene','nora',
+  'esperanza','luz','mercedes','margarita','victoria','celeste','estrella','ines','amanda',
+  'jennifer','nicole','michelle','crystal','amber','britney','emma','olivia','isla','mia',
+  'chloe','grace','lily','ruby','luna','aurora','violeta','renata','emilia','agustina',
+  'rocio','belen','florencia','magdalena','micaela','candela','milagros','antonella','ximena',
+]);
+
+function detectarGenero(n) {
+  const low = n.toLowerCase().trim();
+  if (NOMBRES_FEMENINOS.has(low)) return 'F';
+  if (low.endsWith('a') && !['elias','lucas','tomas','nicolas','matias','tobias','isaias','jeremias','ezequias','josias'].includes(low)) return 'F';
+  return 'M';
+}
+
+/* ════════════════════════════════════
+   PANTALLA 3 — RESULTADO
+════════════════════════════════════ */
+function llenarTarjeta(d) {
+  const key = sel.tipo + '_' + sel.sabor + '_' + sel.cerveza;
+  const meta = ARQUETIPOS_META[key] || ARQUETIPOS_META['lager_suave_pils'];
+  const genero = detectarGenero(nombre);
+
+  /* Nombre arquetipo */
+  set('rc-perfil', d.nombrePerfil);
+
+  /* Badge rareza */
+  set('rc-badge-top', meta.top);
+  set('rc-badge-bot', meta.tier);
+
+  /* Descripción con palabras resaltadas */
+  const descHtml = meta.desc.replace(/\{([^}]+)\}/g,
+    (_,w) => `<span class=”hl”>${w.toUpperCase()}</span>`);
+  el('rc-desc').innerHTML = descHtml;
+
+  /* Foto */
+  const fotoUrl = FOTOS[sel.tipo];
+  if (fotoUrl) { el('rc-foto').src = fotoUrl; el('rc-foto-wrap').style.display = 'block'; }
+
+  /* Atributos */
+  el('rc-attrs').innerHTML = meta.attrs.map(a =>
+    `<div class=”mc-attr”><div class=”mc-attr-icon”>${a.i}</div>
+     <div class=”mc-attr-label”>${a.l}</div>
+     <div class=”mc-attr-val”>${a.v}</div></div>`
+  ).join('');
+
+  /* Viral */
+  const viralNombre = genero === 'F' ? meta.viralF : meta.viral;
+  set('rc-viral-name', viralNombre);
+
+  /* Footer colección */
+  set('rc-footer', 'ARQUETIPO ' + meta.n + ' / 18');
+
+  /* Story card */
+  const n = nombre.toUpperCase();
+  set('sc-user', n);
+  set('sc-perf', d.nombrePerfil);
+  set('sc-tag', '”' + d.tagline + '”');
+  set('sc-rat', d.ratings);
+  const sr = el('sc-rar');
+  if (d.rareza) { sr.textContent = d.rareza; sr.style.display = 'inline-block'; }
+  else sr.style.display = 'none';
+}
+
+/* Botón Stories */
+document.getElementById('btn-stories').addEventListener('click', async () => {
+  const card = document.getElementById('story-card');
+  const cnv = await html2canvas(card, {backgroundColor:'#1c0a00', scale:3, useCORS:true, allowTaint:true});
+  cnv.toBlob(async blob => {
+    const file = new File([blob], 'kross-match.png', {type:'image/png'});
+    waitingReturn = true;
+    setTimeout(() => { el('btn-ya-compartí').style.display = 'block'; }, 3000);
+    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+      try {
+        await navigator.share({files:[file],
+          title:`${nombre}, tu Kross Match`,
+          text:`¡Soy ${nombre} y mi match perfecto es ${matchData?.nombrePerfil}! #KrossMatch #Krossbar`
+        });
+      } catch(e) { if (e.name==='AbortError') return; }
+    } else {
+      const a = document.createElement('a');
+      a.href = cnv.toDataURL('image/png'); a.download = 'kross-match.png'; a.click();
+    }
+  }, 'image/png');
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && waitingReturn) { waitingReturn = false; setTimeout(irARuleta, 600); }
+});
+document.getElementById('btn-ya-compartí').addEventListener('click', () => { waitingReturn=false; irARuleta(); });
+
+function irARuleta() {
+  set('ruleta-nombre', `¡Suerte, ${nombre}!`);
+  drawWheel(0);
+  goTo('s-ruleta');
+}
+
+/* ════════════════════════════════════
+   PANTALLA 4 — RULETA CRAFT BARREL
+════════════════════════════════════ */
+const wheelCanvas = document.getElementById('wheel-canvas');
+const ctx = wheelCanvas.getContext('2d');
+const SIZE = Math.min(300, window.innerWidth - 48);
+wheelCanvas.width = SIZE; wheelCanvas.height = SIZE;
+const CX = SIZE/2, CY = SIZE/2, R = SIZE/2 - 12;
+
+function drawWheel(angleDeg) {
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  ctx.save();
+  ctx.translate(CX, CY);
+  ctx.rotate(angleDeg * Math.PI / 180);
+
+  /* Sombra del barril */
+  ctx.beginPath();
+  ctx.arc(0, 0, R+4, 0, 2*Math.PI);
+  ctx.fillStyle = 'rgba(0,0,0,.4)';
+  ctx.fill();
+
+  const segRad = 2*Math.PI / SEGMENTS.length;
+  SEGMENTS.forEach((seg, i) => {
+    const start = -Math.PI/2 + i * segRad;
+    const end   = start + segRad;
+
+    /* Fondo del segmento */
+    ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.arc(0, 0, R, start, end); ctx.closePath();
+    ctx.fillStyle = seg.bg; ctx.fill();
+
+    /* Borde del segmento (radio de barril) */
+    ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.arc(0, 0, R, start, end); ctx.closePath();
+    ctx.strokeStyle = seg.arc; ctx.lineWidth = 2; ctx.stroke();
+
+    /* Textura de madera: líneas radiales suaves */
+    ctx.save();
+    for (let w = 0; w < 4; w++) {
+      const wa = start + (w/4) * segRad;
+      ctx.beginPath(); ctx.moveTo(0,0);
+      ctx.lineTo(Math.cos(wa)*R, Math.sin(wa)*R);
+      ctx.strokeStyle = 'rgba(255,255,255,.03)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    ctx.restore();
+
+    /* Icono + texto horizontal legible */
+    ctx.save();
+    const midAngle = start + segRad/2;
+    ctx.rotate(midAngle);
+
+    /* Fondo pastilla para el texto */
+    const pillW = 52, pillH = 40;
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    roundRect(ctx, -pillW/2, -R+18, pillW, pillH, 8);
+    ctx.fill();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = seg.text;
+
+    /* Icono */
+    ctx.font = 'bold 18px Segoe UI';
+    ctx.fillText(seg.icon, 0, -R+34);
+
+    /* Label */
+    ctx.font = 'bold 10px Segoe UI';
+    seg.label.forEach((line, li) => {
+      ctx.fillText(line, 0, -R+50 + li*13);
+    });
+    ctx.restore();
+  });
+
+  /* Aro exterior estilo barril con remaches */
+  ctx.beginPath(); ctx.arc(0,0,R+1,0,2*Math.PI);
+  ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 4; ctx.stroke();
+
+  /* Segundo aro interno */
+  ctx.beginPath(); ctx.arc(0,0,R-8,0,2*Math.PI);
+  ctx.strokeStyle = 'rgba(212,160,23,.2)'; ctx.lineWidth = 1; ctx.stroke();
+
+  /* Remaches (bronce) */
+  for (let i=0; i<12; i++) {
+    const a = (i/12)*2*Math.PI;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a)*(R+1), Math.sin(a)*(R+1), 4, 0, 2*Math.PI);
+    ctx.fillStyle = '#c8900a'; ctx.fill();
+    ctx.strokeStyle = '#d4a017'; ctx.lineWidth = .8; ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+/* Cliqueo del puntero */
+let lastClickAngle = -1;
+function checkClick(angle) {
+  const segAngle = 45;
+  const tick = Math.floor(((angle % 360) + 360) % 360 / (segAngle/4));
+  if (tick !== lastClickAngle) {
+    lastClickAngle = tick;
+    vibratePointer();
+  }
+}
+function vibratePointer() {
+  const ptr = document.querySelector('.wheel-pointer');
+  ptr.style.transform = 'translateX(-50%) scale(1.35)';
+  setTimeout(() => { ptr.style.transform = 'translateX(-50%) scale(1)'; }, 80);
+}
+
+document.getElementById('btn-girar').addEventListener('click', () => {
+  if (spinning) return;
+  spinning = true;
+  el('btn-girar').disabled = true;
+  el('wheel-center').textContent = '...';
+
+  const r = Math.random() * 100;
+  const premioKey = r < 12.5 ? 'schop' : r < 37.5 ? 'upgrade' : r < 62.5 ? 'sigue' : 'merch';
+  const angles = STOP_ANGLES[premioKey];
+  const targetDeg = angles[Math.floor(Math.random() * angles.length)];
+
+  const duration = 5500;
+  const start = performance.now();
+  const startAngle = wheelAngle;
+
+  function easeOut(t) {
+    /* Aceleración inicial → desaceleración con "rebotico" */
+    return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+  }
+
+  function frame(now) {
+    const t = Math.min((now - start) / duration, 1);
+    wheelAngle = startAngle + (targetDeg - startAngle) * easeOut(t);
+    checkClick(wheelAngle);
+    drawWheel(wheelAngle);
+    if (t < 1) { requestAnimationFrame(frame); return; }
+    spinning = false;
+    el('wheel-center').textContent = PREMIOS[premioKey].icon;
+    setTimeout(() => mostrarPremio(premioKey), 900);
+  }
+  requestAnimationFrame(frame);
+});
+
+/* ════════════════════════════════════
+   PANTALLA 5 — PREMIO + CONFETI
+════════════════════════════════════ */
+function mostrarPremio(key) {
+  const p = PREMIOS[key];
+  const cod = `KROSS-${nombre.slice(0,5).toUpperCase().replace(/\s/g,'')}-${Math.floor(Math.random()*900)+100}`;
+
+  /* Construir perforaciones del ticket */
+  const holes = el('ticket-holes');
+  holes.innerHTML = '';
+  for (let i=0;i<9;i++) {
+    const h = document.createElement('div');
+    h.className = 'ticket-hole'; holes.appendChild(h);
+  }
+
+  /* Color del ticket según premio */
+  const topCard = el('ticket-top');
+  const botCard = el('premio-card');
+  topCard.style.borderColor = p.borderColor;
+  botCard.style.borderColor = p.borderColor;
+  el('ticket-holes').querySelectorAll('.ticket-hole').forEach(h => {
+    h.style.borderColor = p.borderColor+'66';
+  });
+  el('ticket-dash').style.borderColor = p.borderColor+'55';
+
+  set('premio-icon', p.icon);
+  const titEl = el('premio-titulo');
+  titEl.textContent = p.titulo; titEl.style.color = p.titleColor;
+  set('premio-desc', p.desc);
+
+  const codigoBox = el('premio-card');
+  if (key === 'sigue') {
+    codigoBox.style.display = 'none';
+  } else {
+    codigoBox.style.display = '';
+    set('codigo-valor', cod);
+  }
+
+  goTo('s-premio');
+  if (key !== 'sigue') setTimeout(lanzarConfeti, 200);
+}
+
+/* ── CONFETI ── */
+function lanzarConfeti() {
+  const cnv = el('confetti-canvas');
+  cnv.width = window.innerWidth;
+  cnv.height = window.innerHeight;
+  const ctx2 = cnv.getContext('2d');
+  cnv.classList.add('active');
+
+  const COLORS = ['#d4a017','#e8820a','#7ac97a','#ff9060','#f0f0f0','#c8900a'];
+  const pieces = Array.from({length:90}, () => ({
+    x: Math.random() * cnv.width,
+    y: -10 - Math.random() * 60,
+    r: 4 + Math.random() * 5,
+    c: COLORS[Math.floor(Math.random()*COLORS.length)],
+    vx: (Math.random()-.5)*3,
+    vy: 2 + Math.random()*3,
+    rot: Math.random()*360,
+    vrot: (Math.random()-.5)*6,
+    shape: Math.random() > .5 ? 'rect' : 'circle',
+    w: 6 + Math.random()*8, h: 3 + Math.random()*5,
+    life: 1
+  }));
+
+  let frame = 0;
+  function animConfeti() {
+    ctx2.clearRect(0,0,cnv.width,cnv.height);
+    let alive = false;
+    pieces.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.rot += p.vrot; p.life -= .004;
+      if (p.y < cnv.height && p.life > 0) alive = true;
+      ctx2.save();
+      ctx2.globalAlpha = Math.max(0, p.life);
+      ctx2.translate(p.x, p.y);
+      ctx2.rotate(p.rot * Math.PI/180);
+      ctx2.fillStyle = p.c;
+      if (p.shape === 'rect') ctx2.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      else { ctx2.beginPath(); ctx2.arc(0,0,p.r,0,2*Math.PI); ctx2.fill(); }
+      ctx2.restore();
+    });
+    if (alive && frame < 180) { frame++; requestAnimationFrame(animConfeti); }
+    else { cnv.classList.remove('active'); ctx2.clearRect(0,0,cnv.width,cnv.height); }
+  }
+  requestAnimationFrame(animConfeti);
+}
+
+/* ════════════════════════════════════
+   RESET
+════════════════════════════════════ */
+document.getElementById('btn-nuevo').addEventListener('click', () => {
+  nombre=''; sel={tipo:null,sabor:null,cerveza:null};
+  matchData=null; wheelAngle=0; spinning=false; waitingReturn=false;
+  el('input-nombre').value='';
+  el('btn-inicio').disabled=true;
+  document.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
+  el('q-cerveza').classList.remove('show');
+  el('btn-match').disabled=true;
+  el('btn-ya-compartí').style.display='none';
+  el('premio-card').style.display='';
+  el('btn-girar').disabled=false;
+  el('prog-bar').style.width='33%';
+  el('prog-label').textContent='Paso 1 de 3';
+  el('rc-foto-wrap').style.display='none';
+  drawWheel(0);
+  goTo('s-intro');
+});
+
+/* ════════════════════════════════════
+   UTILS
+════════════════════════════════════ */
+function set(id,val){const e=el(id);if(e)e.textContent=val;}
+function el(id){return document.getElementById(id);}
+
+drawWheel(0);
+</script>
+</body>
+</html>
