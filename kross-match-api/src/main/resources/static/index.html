@@ -129,6 +129,10 @@
       text-transform:uppercase;letter-spacing:-1px;line-height:1;margin-bottom:10px;
       text-shadow:0 2px 30px rgba(255,199,44,.5)}
 
+    .mc-tagline{font-size:.72rem;color:#FFB6D7;font-weight:600;letter-spacing:1px;
+      line-height:1.5;margin-bottom:12px;font-style:italic;opacity:.9;text-align:center;
+      max-width:320px}
+
     .mc-badge{display:inline-flex;flex-direction:column;align-items:center;margin-bottom:11px;gap:5px}
     .mc-badge-top{
       background:linear-gradient(180deg,#FFD54A,#FFB300);color:#8A0051;
@@ -421,6 +425,7 @@
       <div class="mc-ofic">— RESULTADO OFICIAL —</div>
       <div class="mc-header">TU MATCH PERFECTO ES</div>
       <div class="mc-archetype" id="rc-perfil"></div>
+      <div class="mc-tagline" id="rc-tagline"></div>
       <div class="mc-badge">
         <div class="mc-badge-top" id="rc-badge-top">TOP 5%</div>
         <div class="mc-badge-bot" id="rc-badge-bot">ARQUETIPO LEGENDARIO</div>
@@ -435,7 +440,7 @@
         <div class="mc-viral-q">¿QUIÉN ES <span id="rc-viral-prefix">EL</span></div>
         <div class="mc-viral-hl" id="rc-viral-name"></div>
         <div class="mc-viral-q">DE TU GRUPO?</div>
-        <div class="mc-viral-cta">✦ ETIQUÉTALO. ✦</div>
+        <div class="mc-viral-cta" id="rc-viral-cta">✦ ETIQUÉTALO. ✦</div>
       </div>
       <div class="mc-footer" id="rc-footer">ARQUETIPO 01 / 18</div>
     </div>
@@ -792,8 +797,9 @@ function llenarTarjeta(d) {
   const meta = ARQUETIPOS_META[key] || ARQUETIPOS_META['lager_suave_pils'];
   const genero = detectarGenero(nombre);
 
-  /* Nombre arquetipo */
+  /* Nombre arquetipo + tagline */
   set('rc-perfil', d.nombrePerfil);
+  set('rc-tagline', d.tagline || '');
 
   /* Badge rareza */
   set('rc-badge-top', meta.top);
@@ -825,6 +831,9 @@ function llenarTarjeta(d) {
   const viralParts = viralNombre.split(' ');
   set('rc-viral-prefix', viralParts[0].toUpperCase());
   set('rc-viral-name', viralParts.slice(1).join(' '));
+
+  /* Viral CTA — pregunta personalizada por arquetipo */
+  if (d.viralQuestion) set('rc-viral-cta', '✦ ' + d.viralQuestion.toUpperCase() + ' ✦');
 
   /* Footer colección — número viene del backend */
   set('rc-footer', 'ARQUETIPO ' + (d.collectionNumber || meta.n) + ' / 18');
