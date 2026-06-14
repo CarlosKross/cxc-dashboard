@@ -4,24 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Kross Match</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-    html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;color:#f0f0f0}
-    /* Previene zoom en inputs iOS */
-    input,button,select,textarea{font-size:16px}
+    html,body{height:100%;overflow:hidden;font-family:'Montserrat','Segoe UI',system-ui,sans-serif;color:#f0f0f0}
+    input,button,select,textarea{font-size:16px;font-family:inherit}
 
-    /* ── FONDO DARK GRAIN (Kross Black) ── */
+    /* ── FONDO MAGENTA PREMIUM ── */
     body{
-      background-color:#111111;
-      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)' opacity='0.07'/%3E%3C/svg%3E");
+      background-color:#230015;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)' opacity='0.06'/%3E%3C/svg%3E");
       background-size:300px 300px;
     }
     body::before{
-      content:'';position:fixed;inset:0;
-      background:radial-gradient(ellipse at 50% 0%,rgba(245,179,0,.04) 0%,transparent 60%),
-                 linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.35) 50%,rgba(0,0,0,.7) 100%);
-      pointer-events:none;z-index:0;
+      content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+      background:
+        radial-gradient(ellipse at 50% 25%, rgba(197,0,116,.5) 0%, transparent 62%),
+        radial-gradient(ellipse at 10% 75%, rgba(142,0,88,.32) 0%, transparent 48%),
+        radial-gradient(ellipse at 90% 10%, rgba(116,0,61,.28) 0%, transparent 48%),
+        linear-gradient(180deg,#230015 0%,#12000B 100%);
     }
 
     /* ── PANTALLAS ── */
@@ -39,60 +42,61 @@
     .logo-sub{font-size:.62rem;color:#888;letter-spacing:4px;text-transform:uppercase;margin-top:4px}
 
     /* ── INPUTS / BOTONES ── */
-    .big-input{width:100%;max-width:380px;padding:15px 18px;
-      background:rgba(255,255,255,.04);
-      border:1.5px solid rgba(245,179,0,.25);border-radius:4px;
-      color:#fff;font-size:16px;text-align:center;outline:none;
-      transition:border .2s,box-shadow .2s;letter-spacing:1px;text-transform:uppercase;
-      font-weight:700}
-    .big-input:focus{border-color:#F5B300;box-shadow:0 0 0 3px rgba(245,179,0,.12)}
-    .big-input::placeholder{color:#555;font-weight:400;text-transform:none;letter-spacing:0}
+    .big-input{width:100%;max-width:380px;padding:16px 20px;
+      background:#FFFFFF;border:none;border-radius:20px;
+      color:#1A0010;font-size:17px;text-align:center;outline:none;
+      transition:box-shadow .2s;letter-spacing:1px;font-weight:700}
+    .big-input:focus{box-shadow:0 0 0 3px rgba(255,60,158,.35)}
+    .big-input::placeholder{color:#B3B3B3;font-weight:500;letter-spacing:0;text-transform:none}
 
-    .btn-gold{width:100%;max-width:380px;padding:16px;
-      background:#F5B300;color:#111111;font-size:.9rem;font-weight:900;
-      border:none;border-radius:4px;cursor:pointer;letter-spacing:3px;
+    .btn-gold{width:100%;max-width:380px;padding:18px 16px;
+      background:linear-gradient(180deg,#FFD54A 0%,#FFB300 100%);
+      color:#8A0051;font-size:.9rem;font-weight:900;
+      border:none;border-radius:22px;cursor:pointer;letter-spacing:4px;
       text-transform:uppercase;transition:transform .15s,opacity .2s;
-      margin-top:12px;position:relative;overflow:hidden;
-      box-shadow:0 4px 20px rgba(245,179,0,.3)}
+      margin-top:14px;position:relative;overflow:hidden;
+      box-shadow:0 0 24px rgba(255,199,44,.55),0 4px 16px rgba(0,0,0,.3)}
     .btn-gold:disabled{opacity:.25;cursor:not-allowed;animation:none;box-shadow:none}
     .btn-gold:not(:disabled){animation:pulse 2.4s ease-in-out infinite}
     .btn-gold:active:not(:disabled){transform:scale(.98)}
-    @keyframes pulse{0%,100%{box-shadow:0 4px 20px rgba(245,179,0,.3)}
-      50%{box-shadow:0 4px 32px rgba(245,179,0,.65),0 0 0 6px rgba(245,179,0,.08)}}
+    @keyframes pulse{0%,100%{box-shadow:0 0 24px rgba(255,199,44,.55),0 4px 16px rgba(0,0,0,.3)}
+      50%{box-shadow:0 0 36px rgba(255,199,44,.8),0 4px 20px rgba(0,0,0,.35),0 0 0 6px rgba(255,199,44,.1)}}
 
-    .btn-outline{width:100%;max-width:380px;padding:13px;background:transparent;
-      border:1.5px solid rgba(245,179,0,.35);color:#F5B300;font-size:.82rem;
+    .btn-outline{width:100%;max-width:380px;padding:14px;
+      background:rgba(58,0,31,.72);
+      border:2px solid #FF3C9E;color:#FFFFFF;font-size:.82rem;
       font-weight:700;letter-spacing:2px;text-transform:uppercase;
-      border-radius:4px;cursor:pointer;transition:all .2s;margin-top:10px}
-    .btn-outline:active{border-color:#F5B300;background:rgba(245,179,0,.07)}
+      border-radius:22px;cursor:pointer;transition:all .2s;margin-top:10px}
+    .btn-outline:active{background:rgba(255,60,158,.15)}
 
     /* ── PROGRESS BAR ── */
     .progress-bar-wrap{width:100%;max-width:420px;margin-bottom:14px}
-    .progress-bar-track{width:100%;height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden}
-    .progress-bar-fill{height:2px;background:#F5B300;border-radius:1px;transition:width .4s ease}
-    .progress-label{font-size:.58rem;color:#666;letter-spacing:2px;text-align:right;margin-top:5px;text-transform:uppercase}
+    .progress-bar-track{width:100%;height:3px;background:rgba(161,0,98,.4);border-radius:2px;overflow:hidden}
+    .progress-bar-fill{height:3px;background:#FFC72C;border-radius:2px;transition:width .4s ease}
+    .progress-label{font-size:.58rem;color:#FF90C8;letter-spacing:2px;text-align:right;margin-top:5px;text-transform:uppercase}
 
     /* ── QUIZ CARDS ── */
     .quiz-wrap{width:100%;max-width:420px}
-    .quiz-card{background:#1B1B1B;border:1px solid rgba(245,179,0,.2);
-      border-radius:8px;padding:16px;margin-bottom:10px}
-    .quiz-card h2{font-size:.78rem;color:#F5B300;margin-bottom:12px;
+    .quiz-card{background:rgba(44,0,28,.72);border:1.5px solid rgba(255,60,158,.3);
+      border-radius:16px;padding:16px;margin-bottom:10px;
+      box-shadow:0 0 18px rgba(255,60,158,.08)}
+    .quiz-card h2{font-size:.78rem;color:#FFC72C;margin-bottom:12px;
       letter-spacing:3px;text-transform:uppercase;font-weight:900}
     .opts{display:flex;flex-wrap:wrap;gap:8px}
 
     /* Opciones como cards */
-    .opt{padding:10px 12px;border-radius:6px;border:1.5px solid rgba(255,255,255,.08);
-      background:rgba(255,255,255,.03);color:#D9D9D9;cursor:pointer;
+    .opt{padding:10px 12px;border-radius:12px;border:1.5px solid rgba(255,60,158,.18);
+      background:rgba(74,0,45,.5);color:#FFB6D7;cursor:pointer;
       font-size:.84rem;transition:all .18s;display:flex;align-items:center;gap:8px;
       flex:1;min-width:130px;position:relative;overflow:hidden}
-    .opt:active{border-color:rgba(245,179,0,.4);background:rgba(245,179,0,.06)}
-    .opt.sel{background:rgba(245,179,0,.1);color:#fff;border-color:#F5B300;font-weight:700;
-      box-shadow:0 0 0 1px rgba(245,179,0,.3)}
-    .opt-icon{width:32px;height:32px;border-radius:4px;display:flex;align-items:center;
-      justify-content:center;background:rgba(255,255,255,.05);flex-shrink:0}
+    .opt:active{border-color:#FF3C9E;background:rgba(255,60,158,.12)}
+    .opt.sel{background:rgba(255,60,158,.18);color:#fff;border-color:#FF3C9E;font-weight:700;
+      box-shadow:0 0 0 1px rgba(255,60,158,.4),0 0 12px rgba(255,60,158,.2)}
+    .opt-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;
+      justify-content:center;background:rgba(255,60,158,.1);flex-shrink:0}
     .opt-text{line-height:1.3;min-width:0}
-    .opt-text strong{display:block;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .opt-text span{font-size:.66rem;color:#666;margin-top:1px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .opt-text strong{display:block;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+    .opt-text span{font-size:.66rem;color:#FF90C8;margin-top:1px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
     #q-cerveza{overflow:hidden;max-height:0;opacity:0;transition:max-height .5s,opacity .4s}
     #q-cerveza.show{max-height:320px;opacity:1}
@@ -100,105 +104,108 @@
     /* ── RESULT CARD v5 – Kross Social Story Framework ── */
     .result-wrap{width:100%;max-width:420px}
     #match-card{
-      background:#0d0d0d;border:2px solid #F5B300;border-radius:10px;
+      background:rgba(44,0,28,.88);border:2px solid #FF3C9E;border-radius:20px;
       padding:18px 16px 14px;text-align:center;position:relative;overflow:hidden;
       margin-bottom:14px;
-      box-shadow:0 0 0 1px rgba(245,179,0,.12), 0 10px 44px rgba(0,0,0,.7)}
+      box-shadow:0 0 0 1px rgba(255,60,158,.15),0 0 32px rgba(255,60,158,.2),0 10px 44px rgba(0,0,0,.7)}
     #match-card::before{
       content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
       background:
-        radial-gradient(ellipse at 12% 12%, rgba(245,179,0,.06) 0%, transparent 52%),
-        radial-gradient(ellipse at 88% 88%, rgba(245,179,0,.05) 0%, transparent 52%)}
+        radial-gradient(ellipse at 15% 15%, rgba(197,0,116,.12) 0%, transparent 52%),
+        radial-gradient(ellipse at 85% 85%, rgba(142,0,88,.1) 0%, transparent 52%)}
     #match-card::after{
       content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
-      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E")}
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E")}
     #match-card>*{position:relative;z-index:1}
 
-    .mc-ofic{font-size:.5rem;color:#F5B300;letter-spacing:4px;text-transform:uppercase;
-      margin-bottom:4px;opacity:.8;display:flex;align-items:center;justify-content:center;gap:9px}
-    .mc-ofic::before,.mc-ofic::after{content:'';display:block;width:22px;height:1px;background:#F5B300;opacity:.5}
+    .mc-ofic{font-size:.5rem;color:#FF90C8;letter-spacing:4px;text-transform:uppercase;
+      margin-bottom:4px;opacity:.9;display:flex;align-items:center;justify-content:center;gap:9px}
+    .mc-ofic::before,.mc-ofic::after{content:'';display:block;width:22px;height:1px;background:#FF3C9E;opacity:.6}
 
-    .mc-header{font-size:.62rem;font-weight:700;color:#D9D9D9;letter-spacing:3px;
+    .mc-header{font-size:.62rem;font-weight:700;color:#FFB6D7;letter-spacing:3px;
       text-transform:uppercase;margin-bottom:6px}
 
-    .mc-archetype{font-size:clamp(2.1rem,11vw,3.5rem);font-weight:900;color:#F5B300;
+    .mc-archetype{font-size:clamp(2.1rem,11vw,3.5rem);font-weight:900;color:#FFC72C;
       text-transform:uppercase;letter-spacing:-1px;line-height:1;margin-bottom:10px;
-      text-shadow:0 2px 30px rgba(245,179,0,.45)}
+      text-shadow:0 2px 30px rgba(255,199,44,.5)}
 
     .mc-badge{display:inline-flex;flex-direction:column;align-items:center;margin-bottom:11px;gap:5px}
     .mc-badge-top{
-      background:#F5B300;color:#111;font-size:.9rem;font-weight:900;
-      letter-spacing:4px;padding:5px 30px;text-transform:uppercase;
+      background:linear-gradient(180deg,#FFD54A,#FFB300);color:#8A0051;
+      font-size:.9rem;font-weight:900;letter-spacing:4px;padding:5px 30px;
+      text-transform:uppercase;
       clip-path:polygon(10px 0%,calc(100% - 10px) 0%,100% 50%,calc(100% - 10px) 100%,10px 100%,0% 50%)}
-    .mc-badge-bot{color:#F5B300;font-size:.55rem;font-weight:700;letter-spacing:3px;
+    .mc-badge-bot{color:#FFC72C;font-size:.55rem;font-weight:700;letter-spacing:3px;
       text-transform:uppercase;display:flex;align-items:center;gap:10px}
     .mc-badge-bot::before,.mc-badge-bot::after{content:'';display:block;width:28px;height:1px;
-      background:#F5B300;opacity:.55}
+      background:#FF3C9E;opacity:.6}
 
-    .mc-desc{font-size:.78rem;color:#ccc;line-height:1.72;margin-bottom:11px;padding:0 4px}
-    .mc-desc .hl{color:#F5B300;font-weight:800}
+    .mc-desc{font-size:.78rem;color:#FFB6D7;line-height:1.72;margin-bottom:11px;padding:0 4px}
+    .mc-desc .hl{color:#FFC72C;font-weight:800}
 
     .rc-foto-wrap{width:100%;margin-bottom:12px;position:relative;
-      border:2px solid #F5B300;border-radius:4px;overflow:hidden;
-      box-shadow:0 0 0 1px rgba(245,179,0,.15), 0 0 24px rgba(245,179,0,.12)}
+      border:2px solid #FF5BAA;border-radius:12px;overflow:hidden;
+      box-shadow:0 0 0 1px rgba(255,60,158,.2),0 0 24px rgba(255,60,158,.2)}
     .rc-foto{width:100%;height:175px;object-fit:cover;display:block;
       filter:brightness(.78) saturate(1.3) contrast(1.12)}
     .rc-foto-overlay{position:absolute;bottom:0;left:0;right:0;height:52px;
-      background:linear-gradient(transparent,#0d0d0d)}
+      background:linear-gradient(transparent,rgba(44,0,28,.9))}
 
     .mc-attrs{display:flex;align-items:center;margin-bottom:12px}
     .mc-attr{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;
-      border-right:1px solid rgba(245,179,0,.2)}
+      border-right:1px solid rgba(255,60,158,.2)}
     .mc-attr:last-child{border-right:none}
-    .mc-attr-icon{width:44px;height:44px;border-radius:50%;border:1.5px solid rgba(245,179,0,.45);
+    .mc-attr-icon{width:44px;height:44px;border-radius:50%;border:1.5px solid rgba(255,60,158,.5);
       display:flex;align-items:center;justify-content:center;font-size:1.25rem;
-      background:rgba(245,179,0,.07);margin-bottom:4px}
-    .mc-attr-label{font-size:.43rem;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px}
-    .mc-attr-val{font-size:1.1rem;font-weight:900;color:#F5B300}
+      background:rgba(255,60,158,.08);margin-bottom:4px}
+    .mc-attr-label{font-size:.43rem;color:#FF90C8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px}
+    .mc-attr-val{font-size:1.1rem;font-weight:900;color:#FFC72C}
 
-    .mc-viral{border:1.5px solid rgba(245,179,0,.32);border-radius:8px;
-      padding:12px 12px 0;margin-bottom:10px;overflow:hidden;background:rgba(245,179,0,.025)}
-    .mc-viral-q{font-size:.65rem;font-weight:700;color:#D9D9D9;text-transform:uppercase;
+    .mc-viral{border:1.5px solid rgba(255,60,158,.35);border-radius:12px;
+      padding:12px 12px 0;margin-bottom:10px;overflow:hidden;background:rgba(255,60,158,.04)}
+    .mc-viral-q{font-size:.65rem;font-weight:700;color:#FFB6D7;text-transform:uppercase;
       letter-spacing:2px;line-height:1.5}
-    .mc-viral-hl{font-size:clamp(1.3rem,7vw,2rem);font-weight:900;color:#F5B300;
+    .mc-viral-hl{font-size:clamp(1.3rem,7vw,2rem);font-weight:900;color:#FFC72C;
       text-transform:uppercase;letter-spacing:0px;line-height:1.1;margin:4px 0;
-      text-shadow:0 2px 16px rgba(245,179,0,.4)}
+      text-shadow:0 2px 16px rgba(255,199,44,.4)}
     .mc-viral-cta{display:block;width:calc(100% + 24px);margin:10px -12px 0;
-      background:#F5B300;color:#111;font-size:.95rem;font-weight:900;
-      letter-spacing:3px;text-transform:uppercase;padding:11px;text-align:center}
+      background:linear-gradient(180deg,#FFD54A,#FFB300);color:#8A0051;
+      font-size:.95rem;font-weight:900;letter-spacing:3px;text-transform:uppercase;
+      padding:11px;text-align:center}
 
-    .mc-footer{font-size:.5rem;color:#D68A00;letter-spacing:3px;text-transform:uppercase;
-      border:1px solid rgba(214,138,0,.35);display:inline-flex;align-items:center;gap:8px;
+    .mc-footer{font-size:.5rem;color:#FF90C8;letter-spacing:3px;text-transform:uppercase;
+      border:1px solid rgba(255,60,158,.3);display:inline-flex;align-items:center;gap:8px;
       padding:3px 14px;border-radius:10px;margin-top:6px}
     .mc-footer::before,.mc-footer::after{content:'✦';font-size:.4rem;opacity:.65}
 
     /* Botón Stories */
-    .btn-stories{width:100%;max-width:400px;padding:17px 14px;
-      background:#F5B300;color:#111111;font-size:.88rem;font-weight:900;
-      border:none;border-radius:4px;cursor:pointer;letter-spacing:3px;
+    .btn-stories{width:100%;max-width:400px;padding:18px 14px;
+      background:linear-gradient(180deg,#FFD54A 0%,#FFB300 100%);
+      color:#8A0051;font-size:.88rem;font-weight:900;
+      border:none;border-radius:22px;cursor:pointer;letter-spacing:3px;
       text-transform:uppercase;transition:transform .15s;
-      box-shadow:0 4px 20px rgba(245,179,0,.3)}
+      box-shadow:0 0 24px rgba(255,199,44,.55)}
     .btn-stories:active{transform:scale(.98)}
-    .hint-share{font-size:.68rem;color:#666;text-align:center;margin-top:8px;line-height:1.7}
+    .hint-share{font-size:.68rem;color:#FF90C8;text-align:center;margin-top:8px;line-height:1.7}
     #btn-ya-compartí{display:none}
 
     /* ── RULETA ── */
     .ruleta-wrap{display:flex;flex-direction:column;align-items:center;width:100%;max-width:380px}
-    .ruleta-title{font-size:.58rem;color:#666;text-align:center;margin-bottom:4px;
+    .ruleta-title{font-size:.58rem;color:#FF90C8;text-align:center;margin-bottom:4px;
       letter-spacing:3px;text-transform:uppercase}
-    .ruleta-nombre{font-size:clamp(1.2rem,5vw,1.55rem);font-weight:900;color:#F5B300;
+    .ruleta-nombre{font-size:clamp(1.2rem,5vw,1.55rem);font-weight:900;color:#FFC72C;
       text-align:center;margin-bottom:14px;letter-spacing:2px;text-transform:uppercase}
     .wheel-container{position:relative;width:min(300px,calc(100vw - 48px));
       height:min(300px,calc(100vw - 48px));margin-bottom:18px}
     #wheel-canvas{display:block;width:100%;height:100%;border-radius:50%;
-      filter:drop-shadow(0 0 14px rgba(245,179,0,.18))}
+      filter:drop-shadow(0 0 18px rgba(255,60,158,.3))}
     .wheel-pointer{position:absolute;top:-10px;left:50%;transform:translateX(-50%);
       width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;
-      border-top:26px solid #F5B300;filter:drop-shadow(0 2px 6px rgba(245,179,0,.6));z-index:10}
+      border-top:26px solid #FFC72C;filter:drop-shadow(0 2px 8px rgba(255,199,44,.7));z-index:10}
     .wheel-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-      width:52px;height:52px;background:#111;border:2px solid #F5B300;border-radius:50%;
+      width:52px;height:52px;background:#3A001F;border:2px solid #FFC72C;border-radius:50%;
       display:flex;align-items:center;justify-content:center;
-      font-size:.55rem;color:#F5B300;font-weight:900;
+      font-size:.55rem;color:#FFC72C;font-weight:900;
       text-align:center;z-index:10;text-transform:uppercase;letter-spacing:1px}
 
     /* ── PREMIO — TICKET ── */
@@ -206,30 +213,30 @@
       align-items:center;gap:10px}
     .ticket-outer{width:100%;position:relative}
     .ticket-holes{display:flex;justify-content:space-between;padding:0 14px;margin-bottom:-1px}
-    .ticket-hole{width:13px;height:13px;border-radius:50%;background:#111111;
-      border:1.5px solid rgba(245,179,0,.3)}
-    .ticket-dash{border:none;border-top:2px dashed rgba(245,179,0,.3);margin:0}
-    .premio-card{width:100%;background:#1B1B1B;
-      border-radius:0 0 8px 8px;padding:22px 18px 18px;text-align:center;
+    .ticket-hole{width:13px;height:13px;border-radius:50%;background:#230015;
+      border:1.5px solid rgba(255,60,158,.3)}
+    .ticket-dash{border:none;border-top:2px dashed rgba(255,60,158,.3);margin:0}
+    .premio-card{width:100%;background:rgba(44,0,28,.9);
+      border-radius:0 0 16px 16px;padding:22px 18px 18px;text-align:center;
       border:1.5px solid;border-top:none}
-    .ticket-top-card{width:100%;border-radius:8px 8px 0 0;background:#1B1B1B;
+    .ticket-top-card{width:100%;border-radius:16px 16px 0 0;background:rgba(44,0,28,.9);
       padding:20px 18px 14px;text-align:center;border:1.5px solid;border-bottom:none}
     .premio-icon{font-size:2.8rem;display:block;margin-bottom:6px}
     .premio-titulo{font-size:clamp(1.2rem,5.5vw,1.55rem);font-weight:900;
       text-transform:uppercase;letter-spacing:2px;margin-bottom:6px}
-    .premio-desc{font-size:.82rem;color:#D9D9D9;line-height:1.6;margin-bottom:14px}
-    .codigo-box{background:rgba(245,179,0,.06);border:1.5px dashed rgba(245,179,0,.4);
-      border-radius:4px;padding:12px;margin-top:4px}
-    .codigo-label{font-size:.56rem;color:#666;letter-spacing:3px;
+    .premio-desc{font-size:.82rem;color:#FFB6D7;line-height:1.6;margin-bottom:14px}
+    .codigo-box{background:rgba(255,199,44,.06);border:1.5px dashed rgba(255,199,44,.4);
+      border-radius:8px;padding:12px;margin-top:4px}
+    .codigo-label{font-size:.56rem;color:#FF90C8;letter-spacing:3px;
       text-transform:uppercase;margin-bottom:6px}
-    .codigo-valor{font-size:clamp(.95rem,4.5vw,1.4rem);font-weight:900;color:#F5B300;
-      letter-spacing:clamp(1px,1.5vw,4px);text-shadow:0 0 12px rgba(245,179,0,.25);
+    .codigo-valor{font-size:clamp(.95rem,4.5vw,1.4rem);font-weight:900;color:#FFC72C;
+      letter-spacing:clamp(1px,1.5vw,4px);text-shadow:0 0 12px rgba(255,199,44,.3);
       word-break:break-all}
-    .urgencia{font-size:.68rem;color:#F5B300;text-align:center;
-      padding:8px 10px;border-radius:4px;
-      background:rgba(245,179,0,.06);border:1px solid rgba(245,179,0,.2);
+    .urgencia{font-size:.68rem;color:#FFC72C;text-align:center;
+      padding:8px 10px;border-radius:8px;
+      background:rgba(255,199,44,.06);border:1px solid rgba(255,199,44,.2);
       margin-top:8px;line-height:1.6}
-    .instruccion{font-size:.76rem;color:#888;text-align:center;line-height:1.7}
+    .instruccion{font-size:.76rem;color:#FF90C8;text-align:center;line-height:1.7}
 
     /* ── CONFETI ── */
     #confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:100;
@@ -262,15 +269,48 @@
      PANTALLA 1: INTRO / NOMBRE
 ════════════════════════════════════════ -->
 <div class="screen active" id="s-intro">
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%">
-    <div class="logo-wrap">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;gap:0">
+
+    <!-- Logo -->
+    <div class="logo-wrap" style="margin-bottom:10px">
       <div class="logo-svg-wrap">
-        <img src="/LOGO KROSS LINEAL_jun2025.png" alt="Kross" style="width:200px;height:auto;mix-blend-mode:multiply;filter:drop-shadow(0 0 12px rgba(212,160,23,.18))"/>
+        <img src="/LOGO KROSS LINEAL_jun2025.png" alt="Kross" style="width:180px;height:auto;filter:brightness(0) invert(1) drop-shadow(0 0 16px rgba(255,60,158,.5))"/>
       </div>
-      <div class="logo-sub" style="margin-top:6px">Descubre tu michelada perfecta</div>
     </div>
-    <input class="big-input" id="input-nombre" type="text" placeholder="¿Cómo te llamas?" maxlength="20" autocomplete="off" />
-    <button class="btn-gold" id="btn-inicio" disabled>COMENZAR →</button>
+
+    <!-- Kross Match label -->
+    <div style="font-size:.52rem;color:#FF90C8;letter-spacing:5px;text-transform:uppercase;margin-bottom:14px;opacity:.85">— KROSS MATCH —</div>
+
+    <!-- Headline -->
+    <div style="text-align:center;margin-bottom:6px;padding:0 8px">
+      <div style="font-size:.72rem;color:#FFB6D7;letter-spacing:2px;text-transform:uppercase;font-weight:600">Descubre tu</div>
+      <div style="font-size:clamp(2rem,10vw,2.8rem);font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:-1px;line-height:1">MATCH</div>
+      <div style="font-size:clamp(2rem,10vw,2.8rem);font-weight:900;color:#FFC72C;text-transform:uppercase;letter-spacing:-1px;line-height:1;text-shadow:0 0 28px rgba(255,199,44,.5)">CERVECERO 🍺</div>
+    </div>
+
+    <!-- Microcopy -->
+    <div style="font-size:.65rem;color:#FF90C8;letter-spacing:1px;margin-bottom:16px;opacity:.8">⚡ Solo 3 preguntas · 20 segundos</div>
+
+    <!-- Benefits -->
+    <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;justify-content:center;padding:0 8px">
+      <div style="background:rgba(74,0,45,.75);border:1.5px solid #FF3C9E;border-radius:999px;padding:6px 14px;font-size:.58rem;color:#FFB6D7;letter-spacing:1px;white-space:nowrap">3 preguntas rápidas</div>
+      <div style="background:rgba(74,0,45,.75);border:1.5px solid #FF3C9E;border-radius:999px;padding:6px 14px;font-size:.58rem;color:#FFB6D7;letter-spacing:1px;white-space:nowrap">Arquetipo exclusivo</div>
+      <div style="background:rgba(74,0,45,.75);border:1.5px solid #FF3C9E;border-radius:999px;padding:6px 14px;font-size:.58rem;color:#FFB6D7;letter-spacing:1px;white-space:nowrap">Premio secreto 🎰</div>
+    </div>
+
+    <!-- Input + CTA -->
+    <input class="big-input" id="input-nombre" type="text" placeholder="¿Cómo te llamas?" maxlength="20" autocomplete="off" style="max-width:340px"/>
+    <button class="btn-gold" id="btn-inicio" disabled style="max-width:340px">DESCUBRIR MI MATCH →</button>
+
+    <!-- Trust bar -->
+    <div style="display:flex;align-items:center;gap:14px;margin-top:20px;opacity:.7">
+      <span style="font-size:.55rem;color:#FF90C8">💜 100% Gratis</span>
+      <span style="color:rgba(255,60,158,.4);font-size:.6rem">|</span>
+      <span style="font-size:.55rem;color:#FF90C8">Sin registro</span>
+      <span style="color:rgba(255,60,158,.4);font-size:.6rem">|</span>
+      <span style="font-size:.55rem;color:#FF90C8">Hecho para Kross Lovers</span>
+    </div>
+
   </div>
 </div>
 
@@ -410,8 +450,8 @@
 ════════════════════════════════════════ -->
 <div class="screen" id="s-ruleta">
   <div class="ruleta-wrap" style="margin-top:20px">
-    <div class="ruleta-title">Ruleta de Premios Secreta</div>
-    <div class="ruleta-nombre" id="ruleta-nombre">¡Suerte!</div>
+    <div class="ruleta-title">✦ RULETA DE PREMIOS SECRETA ✦</div>
+    <div class="ruleta-nombre" id="ruleta-nombre">¡SUERTE!</div>
     <div class="wheel-container">
       <div class="wheel-pointer"></div>
       <canvas id="wheel-canvas" width="310" height="310"></canvas>
@@ -514,16 +554,16 @@ const PREMIOS = {
     borderColor:'#444444',titleColor:'#D9D9D9'},
 };
 
-/* Segmentos ruleta — 8 segmentos intercalados */
+/* Segmentos ruleta — 8 segmentos intercalados, paleta magenta */
 const SEGMENTS = [
-  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#1a2a1a', arc:'#4a8a4a', text:'#6ab86a'},
-  {key:'upgrade', label:['UPGRADE','GRATIS'],  icon:'🍊', bg:'#2a1e00', arc:'#F5B300', text:'#F5B300'},
-  {key:'sigue',   label:['SIGUE','JUGANDO'],   icon:'🎲', bg:'#181828', arc:'#5566aa', text:'#7788cc'},
-  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#1a2a1a', arc:'#4a8a4a', text:'#6ab86a'},
-  {key:'schop',   label:['SCHOP','GRATIS'],    icon:'🍺', bg:'#2a0e08', arc:'#aa3020', text:'#ff7060'},
-  {key:'upgrade', label:['UPGRADE','GRATIS'],  icon:'🍊', bg:'#2a1e00', arc:'#F5B300', text:'#F5B300'},
-  {key:'sigue',   label:['SIGUE','JUGANDO'],   icon:'🎲', bg:'#181828', arc:'#5566aa', text:'#7788cc'},
-  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#1a2a1a', arc:'#4a8a4a', text:'#6ab86a'},
+  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#2a0035', arc:'#FF3C9E', text:'#FF90C8'},
+  {key:'upgrade', label:['UPGRADE','GRATIS'],  icon:'🍊', bg:'#2a1800', arc:'#FFC72C', text:'#FFD54A'},
+  {key:'sigue',   label:['SIGUE','JUGANDO'],   icon:'🎲', bg:'#003050', arc:'#5BC7FF', text:'#8CDFFF'},
+  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#2a0035', arc:'#FF3C9E', text:'#FF90C8'},
+  {key:'schop',   label:['SCHOP','GRATIS'],    icon:'🍺', bg:'#174F24', arc:'#80FF4D', text:'#A0FF70'},
+  {key:'upgrade', label:['UPGRADE','GRATIS'],  icon:'🍊', bg:'#2a1800', arc:'#FFC72C', text:'#FFD54A'},
+  {key:'sigue',   label:['SIGUE','JUGANDO'],   icon:'🎲', bg:'#003050', arc:'#5BC7FF', text:'#8CDFFF'},
+  {key:'merch',   label:['STICKERS','KROSS'],  icon:'🎁', bg:'#2a0035', arc:'#FF3C9E', text:'#FF90C8'},
 ];
 /* Stop angles por tipo (base 6 vueltas = 2160°, +offset por posición de cada segmento)
    Distribución: merch=37.5% (segs 0,3,7), upgrade=25% (segs 1,5), sigue=25% (segs 2,6), schop=12.5% (seg 4) */
@@ -884,21 +924,21 @@ function drawWheel(angleDeg) {
     ctx.restore();
   });
 
-  /* Aro exterior estilo barril con remaches */
+  /* Aro exterior neon gold */
   ctx.beginPath(); ctx.arc(0,0,R+1,0,2*Math.PI);
-  ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 4; ctx.stroke();
+  ctx.strokeStyle = '#FFC72C'; ctx.lineWidth = 4; ctx.stroke();
 
-  /* Segundo aro interno */
+  /* Aro interior magenta */
   ctx.beginPath(); ctx.arc(0,0,R-8,0,2*Math.PI);
-  ctx.strokeStyle = 'rgba(212,160,23,.2)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,60,158,.25)'; ctx.lineWidth = 1.5; ctx.stroke();
 
-  /* Remaches (bronce) */
+  /* Remaches dorados */
   for (let i=0; i<12; i++) {
     const a = (i/12)*2*Math.PI;
     ctx.beginPath();
     ctx.arc(Math.cos(a)*(R+1), Math.sin(a)*(R+1), 4, 0, 2*Math.PI);
-    ctx.fillStyle = '#c8900a'; ctx.fill();
-    ctx.strokeStyle = '#d4a017'; ctx.lineWidth = .8; ctx.stroke();
+    ctx.fillStyle = '#FFB300'; ctx.fill();
+    ctx.strokeStyle = '#FFC72C'; ctx.lineWidth = .8; ctx.stroke();
   }
 
   ctx.restore();
@@ -1013,7 +1053,7 @@ function lanzarConfeti() {
   const ctx2 = cnv.getContext('2d');
   cnv.classList.add('active');
 
-  const COLORS = ['#d4a017','#e8820a','#7ac97a','#ff9060','#f0f0f0','#c8900a'];
+  const COLORS = ['#FFC72C','#FF3C9E','#FFD54A','#FF90C8','#FFFFFF','#C50074','#80FF4D','#5BC7FF'];
   const pieces = Array.from({length:90}, () => ({
     x: Math.random() * cnv.width,
     y: -10 - Math.random() * 60,
