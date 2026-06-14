@@ -56,7 +56,7 @@
       text-transform:uppercase;transition:transform .15s,opacity .2s;
       margin-top:14px;position:relative;overflow:hidden;
       box-shadow:0 0 24px rgba(255,199,44,.55),0 4px 16px rgba(0,0,0,.3)}
-    .btn-gold:disabled{opacity:.25;cursor:not-allowed;animation:none;box-shadow:none}
+    .btn-gold:disabled{opacity:.45;cursor:not-allowed;animation:none;box-shadow:none;filter:saturate(.4)}
     .btn-gold:not(:disabled){animation:pulse 2.4s ease-in-out infinite}
     .btn-gold:active:not(:disabled){transform:scale(.98)}
     @keyframes pulse{0%,100%{box-shadow:0 0 24px rgba(255,199,44,.55),0 4px 16px rgba(0,0,0,.3)}
@@ -88,15 +88,15 @@
     .opt{padding:10px 12px;border-radius:12px;border:1.5px solid rgba(255,60,158,.18);
       background:rgba(74,0,45,.5);color:#FFB6D7;cursor:pointer;
       font-size:.84rem;transition:all .18s;display:flex;align-items:center;gap:8px;
-      flex:1;min-width:130px;position:relative;overflow:hidden}
+      flex:1 1 calc(50% - 4px);min-width:0;position:relative;overflow:hidden}
     .opt:active{border-color:#FF3C9E;background:rgba(255,60,158,.12)}
     .opt.sel{background:rgba(255,60,158,.18);color:#fff;border-color:#FF3C9E;font-weight:700;
       box-shadow:0 0 0 1px rgba(255,60,158,.4),0 0 12px rgba(255,60,158,.2)}
     .opt-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;
       justify-content:center;background:rgba(255,60,158,.1);flex-shrink:0}
     .opt-text{line-height:1.3;min-width:0}
-    .opt-text strong{display:block;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
-    .opt-text span{font-size:.66rem;color:#FF90C8;margin-top:1px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .opt-text strong{display:block;font-size:.82rem;line-height:1.3;color:#fff}
+    .opt-text span{font-size:.65rem;color:#FF90C8;margin-top:2px;display:block;line-height:1.3}
 
     #q-cerveza{overflow:hidden;max-height:0;opacity:0;transition:max-height .5s,opacity .4s}
     #q-cerveza.show{max-height:320px;opacity:1}
@@ -152,14 +152,15 @@
       background:linear-gradient(transparent,rgba(44,0,28,.9))}
 
     .mc-attrs{display:flex;align-items:center;margin-bottom:12px}
-    .mc-attr{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;
-      border-right:1px solid rgba(255,60,158,.2)}
+    .mc-attr{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;
+      padding:8px 2px;border-right:1px solid rgba(255,60,158,.2);overflow:hidden}
     .mc-attr:last-child{border-right:none}
-    .mc-attr-icon{width:44px;height:44px;border-radius:50%;border:1.5px solid rgba(255,60,158,.5);
-      display:flex;align-items:center;justify-content:center;font-size:1.25rem;
-      background:rgba(255,60,158,.08);margin-bottom:4px}
-    .mc-attr-label{font-size:.43rem;color:#FF90C8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px}
-    .mc-attr-val{font-size:1.1rem;font-weight:900;color:#FFC72C}
+    .mc-attr-icon{width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,60,158,.5);
+      display:flex;align-items:center;justify-content:center;font-size:1.15rem;
+      background:rgba(255,60,158,.08);margin-bottom:4px;flex-shrink:0}
+    .mc-attr-label{font-size:.5rem;color:#FF90C8;letter-spacing:1px;text-transform:uppercase;
+      margin-bottom:2px;text-align:center;word-break:break-word;line-height:1.2;width:100%}
+    .mc-attr-val{font-size:1.05rem;font-weight:900;color:#FFC72C}
 
     .mc-viral{border:1.5px solid rgba(255,60,158,.35);border-radius:12px;
       padding:12px 12px 0;margin-bottom:10px;overflow:hidden;background:rgba(255,60,158,.04)}
@@ -243,23 +244,23 @@
       opacity:0;transition:opacity .3s}
     #confetti-canvas.active{opacity:1}
 
-    /* ── TARJETA OCULTA PARA CAPTURA ── */
+    /* ── TARJETA OCULTA PARA CAPTURA (magenta premium) ── */
     #story-card{
       position:fixed;left:-9999px;top:0;width:360px;height:640px;
-      background:linear-gradient(155deg,#1c0a00,#0d0805 60%);
+      background:radial-gradient(ellipse at 50% 30%,#C50074 0%,#3A001F 55%,#12000B 100%);
       display:flex;flex-direction:column;justify-content:center;align-items:center;
-      text-align:center;padding:30px 24px;font-family:'Segoe UI',sans-serif;overflow:hidden;
+      text-align:center;padding:30px 24px;font-family:'Montserrat','Segoe UI',sans-serif;overflow:hidden;
     }
-    #story-card .s-brand{font-size:9px;letter-spacing:5px;color:#d4a017;text-transform:uppercase;margin-bottom:4px}
-    #story-card .s-user{font-size:13px;font-weight:900;color:#f0f0f0;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px}
-    #story-card .s-eye{font-size:9px;color:#555;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px}
-    #story-card .s-perf{font-size:28px;font-weight:900;color:#d4a017;line-height:1;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
-    #story-card .s-tag{font-size:12px;color:#ccc;font-style:italic;margin-bottom:10px;line-height:1.5}
-    #story-card .s-div{width:28px;height:2px;background:#d4a017;margin:0 auto 10px}
-    #story-card .s-rat{font-size:12px;color:#f0f0f0;line-height:1.9;white-space:pre-line;margin-bottom:10px}
-    #story-card .s-rar{font-size:8px;color:#d4a017;letter-spacing:2px;text-transform:uppercase;border:1px solid rgba(212,160,23,.4);border-radius:4px;padding:4px 12px;margin-bottom:10px;display:none}
-    #story-card .s-cta{font-size:10px;color:#555;margin-top:10px;line-height:1.7}
-    #story-card .s-hash{font-size:8px;color:#2a2a2a;margin-top:6px}
+    #story-card .s-brand{font-size:9px;letter-spacing:5px;color:#FF90C8;text-transform:uppercase;margin-bottom:6px;opacity:.85}
+    #story-card .s-user{font-size:14px;font-weight:900;color:#fff;letter-spacing:3px;text-transform:uppercase;margin-bottom:2px}
+    #story-card .s-eye{font-size:9px;color:#FF90C8;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px;opacity:.8}
+    #story-card .s-perf{font-size:34px;font-weight:900;color:#FFC72C;line-height:1;letter-spacing:-1px;text-transform:uppercase;margin-bottom:10px;text-shadow:0 0 20px rgba(255,199,44,.4)}
+    #story-card .s-tag{font-size:12px;color:#FFB6D7;margin-bottom:12px;line-height:1.6;font-weight:500}
+    #story-card .s-div{width:40px;height:2px;background:linear-gradient(90deg,#FF3C9E,#FFC72C);margin:0 auto 12px;border-radius:2px}
+    #story-card .s-rat{font-size:13px;color:#fff;line-height:2;white-space:pre-line;margin-bottom:10px;font-weight:600}
+    #story-card .s-rar{font-size:8px;color:#FFC72C;letter-spacing:2px;text-transform:uppercase;border:1px solid rgba(255,199,44,.5);border-radius:12px;padding:4px 14px;margin-bottom:12px;display:none;background:rgba(255,199,44,.08)}
+    #story-card .s-cta{font-size:10px;color:#FF90C8;margin-top:12px;line-height:1.8;letter-spacing:1px}
+    #story-card .s-hash{font-size:9px;color:rgba(255,144,200,.4);margin-top:6px;letter-spacing:2px}
   </style>
 </head>
 <body>
@@ -822,7 +823,7 @@ function llenarTarjeta(d) {
 /* Botón Stories */
 document.getElementById('btn-stories').addEventListener('click', async () => {
   const card = document.getElementById('story-card');
-  const cnv = await html2canvas(card, {backgroundColor:'#1c0a00', scale:3, useCORS:true, allowTaint:true});
+  const cnv = await html2canvas(card, {backgroundColor:'#12000B', scale:3, useCORS:true, allowTaint:true});
   cnv.toBlob(async blob => {
     const file = new File([blob], 'kross-match.png', {type:'image/png'});
     waitingReturn = true;
