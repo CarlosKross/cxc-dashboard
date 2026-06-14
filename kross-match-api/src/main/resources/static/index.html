@@ -594,7 +594,19 @@ inputNombre.addEventListener('input', () => {
 });
 inputNombre.addEventListener('keydown', e => { if (e.key==='Enter' && nombre.length>=2) iniciar(); });
 document.getElementById('btn-inicio').addEventListener('click', iniciar);
-function iniciar() { if (nombre.length < 2) return; goTo('s-quiz'); }
+/* Analytics — fire-and-forget, no bloquea la UI */
+function logEvent(event, data) {
+  fetch('/api/kross-match/event', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({event, ts: new Date().toISOString(), ...data})
+  }).catch(()=>{});
+}
+
+function iniciar() {
+  if (nombre.length < 2) return;
+  logEvent('quiz_started', {nombre});
+  goTo('s-quiz');
+}
 
 /* ════════════════════════════════════
    PANTALLA 2 — QUIZ + PROGRESS BAR
@@ -662,8 +674,11 @@ async function calcularMatch() {
       btn.disabled = false; btn.textContent = 'DESCUBRIR MI PERFIL →'; return;
     }
     matchData = await res.json();
+    logEvent('quiz_completed', {tipo:sel.tipo, sabor:sel.sabor, cerveza:sel.cerveza});
+    logEvent('archetype_assigned', {n: matchData.collectionNumber, perfil: matchData.nombrePerfil});
     llenarTarjeta(matchData);
     goTo('s-result');
+    logEvent('result_viewed', {n: matchData.collectionNumber});
   } catch(e) { alert('Error: ' + e.message + ' | sel=' + JSON.stringify(sel)); }
   btn.disabled = false; btn.textContent = 'DESCUBRIR MI PERFIL →';
 }
@@ -789,9 +804,14 @@ function llenarTarjeta(d) {
     (_,w) => `<span class=”hl”>${w.toUpperCase()}</span>`);
   el('rc-desc').innerHTML = descHtml;
 
-  /* Foto */
-  const fotoUrl = FOTOS[sel.tipo];
-  if (fotoUrl) { el('rc-foto').src = fotoUrl; el('rc-foto-wrap').style.display = 'block'; }
+  /* Foto — usa imageUrl del arquetipo si está disponible, fallback a foto genérica por tipo */
+  const fotoUrl = d.imageUrl || FOTOS[sel.tipo];
+  if (fotoUrl) {
+    const imgEl = el('rc-foto');
+    imgEl.src = fotoUrl;
+    imgEl.onerror = () => { const fb = FOTOS[sel.tipo]; if (fb && imgEl.src !== fb) imgEl.src = fb; };
+    el('rc-foto-wrap').style.display = 'block';
+  }
 
   /* Atributos */
   el('rc-attrs').innerHTML = meta.attrs.map(a =>
@@ -806,8 +826,8 @@ function llenarTarjeta(d) {
   set('rc-viral-prefix', viralParts[0].toUpperCase());
   set('rc-viral-name', viralParts.slice(1).join(' '));
 
-  /* Footer colección */
-  set('rc-footer', 'ARQUETIPO ' + meta.n + ' / 18');
+  /* Footer colección — número viene del backend */
+  set('rc-footer', 'ARQUETIPO ' + (d.collectionNumber || meta.n) + ' / 18');
 
   /* Story card */
   const n = nombre.toUpperCase();
@@ -822,22 +842,23 @@ function llenarTarjeta(d) {
 
 /* Botón Stories */
 document.getElementById('btn-stories').addEventListener('click', async () => {
+  logEvent('share_clicked', {n: matchData?.collectionNumber});
   const card = document.getElementById('story-card');
   const cnv = await html2canvas(card, {backgroundColor:'#12000B', scale:3, useCORS:true, allowTaint:true});
   cnv.toBlob(async blob => {
     const file = new File([blob], 'kross-match.png', {type:'image/png'});
     waitingReturn = true;
     setTimeout(() => { el('btn-ya-compartí').style.display = 'block'; }, 3000);
+    const shareText = `${nombre}: ` + (matchData?.shareHook || `Mi match perfecto es ${matchData?.nombrePerfil}! #KrossMatch #Krossbar`);
     if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
       try {
-        await navigator.share({files:[file],
-          title:`${nombre}, tu Kross Match`,
-          text:`¡Soy ${nombre} y mi match perfecto es ${matchData?.nombrePerfil}! #KrossMatch #Krossbar`
-        });
+        await navigator.share({files:[file], title:`${nombre}, tu Kross Match`, text: shareText});
+        logEvent('share_completed', {n: matchData?.collectionNumber});
       } catch(e) { if (e.name==='AbortError') return; }
     } else {
       const a = document.createElement('a');
       a.href = cnv.toDataURL('image/png'); a.download = 'kross-match.png'; a.click();
+      logEvent('story_downloaded', {n: matchData?.collectionNumber});
     }
   }, 'image/png');
 });
@@ -973,6 +994,7 @@ function vibratePointer() {
 
 document.getElementById('btn-girar').addEventListener('click', () => {
   if (spinning) return;
+  logEvent('roulette_spun', {n: matchData?.collectionNumber});
   spinning = true;
   el('btn-girar').disabled = true;
   el('wheel-center').textContent = '...';
@@ -1042,6 +1064,7 @@ function mostrarPremio(key) {
     set('codigo-valor', cod);
   }
 
+  logEvent('prize_awarded', {prize: key, codigo: key !== 'sigue' ? cod : null});
   goTo('s-premio');
   if (key !== 'sigue') setTimeout(lanzarConfeti, 200);
 }
@@ -1119,6 +1142,9 @@ function set(id,val){const e=el(id);if(e)e.textContent=val;}
 function el(id){return document.getElementById(id);}
 
 drawWheel(0);
+
+/* Evento inicial al cargar */
+logEvent('landing_viewed');
 </script>
 </body>
 </html>

@@ -13,3 +13,7 @@ class MatchResponse(BaseModel):
     tagline: str
     ratings: str
     rareza: Optional[str] = None
+    collectionNumber: str = "01"
+    imageUrl: Optional[str] = None        # Supabase Storage URL (se activa con env SUPABASE_STORAGE_URL)
+    viralQuestion: Optional[str] = None   # Pregunta viral por arquetipo
+    shareHook: Optional[str] = None       # Texto para Web Share API
